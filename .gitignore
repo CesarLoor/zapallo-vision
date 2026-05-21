@@ -1,0 +1,60 @@
+# ===== MONOREPO: ZapalloAI =====
+
+# ----- OS -----
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ----- IDEs -----
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ----- Python / ML Pipeline -----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.ipynb_checkpoints/
+.env
+venv/
+env/
+
+# Datasets (demasiado grandes para Git)
+model/data/raw/
+model/data/processed/
+
+# Runs de entrenamiento (pesos del modelo son pesados)
+model/runs/
+model/exports/*.tflite
+model/exports/*.onnx
+
+# ----- Flutter / Dart -----
+zapallo_app/.dart_tool/
+zapallo_app/.packages
+zapallo_app/build/
+zapallo_app/.flutter-plugins
+zapallo_app/.flutter-plugins-dependencies
+zapallo_app/android/.gradle/
+zapallo_app/android/local.properties
+zapallo_app/android/app/debug/
+zapallo_app/android/app/profile/
+zapallo_app/android/app/release/
+zapallo_app/ios/Pods/
+zapallo_app/ios/.symlinks/
+zapallo_app/ios/Flutter/Flutter.framework
+zapallo_app/ios/Flutter/Flutter.podspec
+*.g.dart
+
+# Pero SÍ incluir el modelo final en assets (es pequeño, <10MB)
+!zapallo_app/assets/models/*.tflite
+!zapallo_app/assets/models/labels.txt
+
+# ----- Documentación generada -----
+documentacion/txt/

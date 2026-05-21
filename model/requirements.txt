@@ -1,0 +1,18 @@
+# Core ML dependencies
+ultralytics>=8.3.0       # YOLOv11 (incluye PyTorch)
+albumentations>=1.4.0    # Data augmentation avanzado
+opencv-python>=4.9.0     # Procesamiento de imágenes
+matplotlib>=3.8.0        # Visualización
+seaborn>=0.13.0          # Confusion matrix plots
+scikit-learn>=1.4.0      # Split estratificado, métricas
+pandas>=2.2.0            # Análisis de datos
+Pillow>=10.0.0           # Lectura/escritura imágenes
+
+# Jupyter
+jupyter>=1.0.0
+ipywidgets>=8.0.0
+
+# Exportación
+onnx>=1.15.0             # Formato intermedio (opcional)
+onnxruntime>=1.17.0      # Validación ONNX (opcional)
+tensorflow>=2.15.0       # Para TFLite conversion (Colab ya lo tiene)
