@@ -86,8 +86,8 @@ class _PreviewView extends StatelessWidget {
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
                       colors: [
-                        Colors.black.withOpacity(0.85),
-                        Colors.black.withOpacity(0.0),
+                        Colors.black.withValues(alpha: 0.85),
+                        Colors.black.withValues(alpha: 0.0),
                       ],
                       stops: const [0.0, 1.0],
                     ),
@@ -183,7 +183,7 @@ class _PreviewView extends StatelessWidget {
     }
 
     final isValidated = state is CaptureValidated;
-    final report = isValidated ? (state as CaptureValidated).report : null;
+    final report = isValidated ? state.report : null;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -255,8 +255,8 @@ class _ValidationChip extends StatelessWidget {
         color: isLoading
             ? Colors.black54
             : isGood
-                ? ZapalloTheme.success.withOpacity(0.85)
-                : ZapalloTheme.warning.withOpacity(0.9),
+                ? ZapalloTheme.success.withValues(alpha: 0.85)
+                : ZapalloTheme.warning.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

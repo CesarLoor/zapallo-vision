@@ -1,30 +1,24 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:zapallo_app/main.dart';
+import 'package:zapallo_app/app.dart';
+import 'package:zapallo_app/core/database/app_database.dart';
+import 'package:zapallo_app/main.dart' as app_main;
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  setUp(() {
+    // Inicializar BD en memoria para tests
+    app_main.db = AppDatabase.forTesting();
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  testWidgets('Home screen carga correctamente', (WidgetTester tester) async {
+    await tester.pumpWidget(const ZapalloApp());
+    await tester.pumpAndSettle();
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Verifica que el título de la app aparece
+    expect(find.text('ZapalloAI'), findsOneWidget);
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verifica que los botones de acción están presentes
+    expect(find.byKey(const Key('btn_capture')), findsOneWidget);
+    expect(find.byKey(const Key('btn_gallery')), findsOneWidget);
   });
 }

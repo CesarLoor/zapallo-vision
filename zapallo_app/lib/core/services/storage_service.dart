@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:drift/drift.dart';
 import '../../config/constants.dart';
 import '../database/app_database.dart';
-import '../database/tables/images_table.dart';
 import 'image_validator.dart';
 
 /// Resultado del guardado de imagen

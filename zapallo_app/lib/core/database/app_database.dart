@@ -11,6 +11,9 @@ part 'app_database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
 
+  /// Constructor para tests: usa base de datos en memoria
+  AppDatabase.forTesting() : super(NativeDatabase.memory());
+
   @override
   int get schemaVersion => 1;
 

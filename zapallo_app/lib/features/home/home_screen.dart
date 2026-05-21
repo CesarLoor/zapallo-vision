@@ -26,10 +26,10 @@ class HomeScreen extends StatelessWidget {
                       width: 88,
                       height: 88,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
+                        color: Colors.white.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha: 0.3),
                           width: 1.5,
                         ),
                       ),
@@ -58,7 +58,7 @@ class HomeScreen extends StatelessWidget {
                         fontFamily: 'Outfit',
                         fontSize: 15,
                         fontWeight: FontWeight.w400,
-                        color: Colors.white.withOpacity(0.80),
+                        color: Colors.white.withValues(alpha: 0.80),
                         height: 1.5,
                       ),
                     ),
@@ -77,7 +77,7 @@ class HomeScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withValues(alpha: 0.15),
                       blurRadius: 30,
                       offset: const Offset(0, 10),
                     ),
@@ -176,7 +176,7 @@ class HomeScreen extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Outfit',
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.5),
+                    color: Colors.white.withValues(alpha: 0.5),
                   ),
                 ),
               ),
@@ -224,7 +224,7 @@ class _HomeActionButton extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: isPrimary
-                      ? Colors.white.withOpacity(0.2)
+                      ? Colors.white.withValues(alpha: 0.2)
                       : ZapalloTheme.primarySurface,
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -255,7 +255,7 @@ class _HomeActionButton extends StatelessWidget {
                         fontFamily: 'Outfit',
                         fontSize: 13,
                         color: isPrimary
-                            ? Colors.white.withOpacity(0.75)
+                            ? Colors.white.withValues(alpha: 0.75)
                             : ZapalloTheme.textSecondary,
                       ),
                     ),
@@ -266,7 +266,7 @@ class _HomeActionButton extends StatelessWidget {
                 Icons.arrow_forward_ios_rounded,
                 size: 16,
                 color: isPrimary
-                    ? Colors.white.withOpacity(0.7)
+                    ? Colors.white.withValues(alpha: 0.7)
                     : ZapalloTheme.textHint,
               ),
             ],

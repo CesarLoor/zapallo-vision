@@ -9,7 +9,6 @@ import '../../core/database/app_database.dart';
 import '../../core/services/storage_service.dart';
 import '../../main.dart';
 import 'cubit/gallery_cubit.dart';
-import 'cubit/gallery_state.dart';
 
 /// Pantalla de detalle de imagen guardada — HU-009, HU-010
 class ImageDetailScreen extends StatelessWidget {
@@ -93,19 +92,26 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
     );
 
     if (confirmed == true && _image != null && mounted) {
-      final success =
-          await context.read<GalleryCubit>().deleteImage(_image!);
+      // Capturar refs ANTES del gap async — safe: verificamos mounted justo arriba
+      // ignore: use_build_context_synchronously
+      final cubit = context.read<GalleryCubit>();
+      // ignore: use_build_context_synchronously
+      final messenger = ScaffoldMessenger.of(context);
+      // ignore: use_build_context_synchronously
+      final router = GoRouter.of(context);
+
+      final success = await cubit.deleteImage(_image!);
       if (mounted) {
         if (success) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             SnackBar(
               content: const Text(AppConstants.msgImageDeleted),
               backgroundColor: ZapalloTheme.primary,
             ),
           );
-          context.pop();
+          router.pop();
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger.showSnackBar(
             const SnackBar(
               content: Text(AppConstants.msgDeleteError),
               backgroundColor: ZapalloTheme.error,

@@ -196,7 +196,7 @@ class _CaptureScreenState extends State<CaptureScreen>
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.black.withOpacity(0.6), Colors.transparent],
+          colors: [Colors.black.withValues(alpha: 0.6), Colors.transparent],
         ),
       ),
       child: Row(
@@ -231,7 +231,7 @@ class _CaptureScreenState extends State<CaptureScreen>
         gradient: LinearGradient(
           begin: Alignment.bottomCenter,
           end: Alignment.topCenter,
-          colors: [Colors.black.withOpacity(0.7), Colors.transparent],
+          colors: [Colors.black.withValues(alpha: 0.7), Colors.transparent],
         ),
       ),
       child: Column(
@@ -243,7 +243,7 @@ class _CaptureScreenState extends State<CaptureScreen>
             style: TextStyle(
               fontFamily: 'Outfit',
               fontSize: 14,
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
             ),
           ),
           const SizedBox(height: 24),
@@ -258,7 +258,7 @@ class _CaptureScreenState extends State<CaptureScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: _isTakingPhoto
-                    ? Colors.white.withOpacity(0.5)
+                    ? Colors.white.withValues(alpha: 0.5)
                     : Colors.white,
                 border: Border.all(color: Colors.white, width: 4),
               ),
@@ -297,7 +297,7 @@ class _FramePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.6)
+      ..color = Colors.white.withValues(alpha: 0.6)
       ..strokeWidth = 2.5
       ..style = PaintingStyle.stroke;
 
