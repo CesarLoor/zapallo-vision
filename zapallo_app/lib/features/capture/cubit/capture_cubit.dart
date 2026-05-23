@@ -7,12 +7,9 @@ class CaptureCubit extends Cubit<CaptureState> {
   final ImageValidator _validator;
   final StorageService _storage;
 
-  CaptureCubit({
-    required ImageValidator validator,
-    required StorageService storage,
-  })  : _validator = validator,
-        _storage = storage,
-        super(const CaptureInitial());
+  CaptureCubit({required this._validator, required StorageService storage})
+    : _storage = storage,
+      super(const CaptureInitial());
 
   /// Valida la imagen recién capturada — FUN-004
   Future<void> validateImage(String imagePath) async {

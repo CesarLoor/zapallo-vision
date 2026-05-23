@@ -1,5 +1,5 @@
 import 'package:equatable/equatable.dart';
-import '../../../core/database/app_database.dart';
+import 'package:zapallo_app/core/database/app_database.dart';
 
 abstract class GalleryState extends Equatable {
   const GalleryState();

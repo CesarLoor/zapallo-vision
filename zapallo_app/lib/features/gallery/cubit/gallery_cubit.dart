@@ -7,10 +7,9 @@ class GalleryCubit extends Cubit<GalleryState> {
   final AppDatabase _db;
   final StorageService _storage;
 
-  GalleryCubit({required AppDatabase db, required StorageService storage})
-      : _db = db,
-        _storage = storage,
-        super(const GalleryLoading());
+  GalleryCubit({required this._db, required StorageService storage})
+    : _storage = storage,
+      super(const GalleryLoading());
 
   /// Carga todas las imágenes — FUN-009
   Future<void> loadImages() async {

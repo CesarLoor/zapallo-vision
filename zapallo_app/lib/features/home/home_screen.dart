@@ -89,7 +89,9 @@ class HomeScreen extends StatelessWidget {
                     // Chip de estado offline
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: ZapalloTheme.primarySurface,
                         borderRadius: BorderRadius.circular(20),
@@ -245,7 +247,9 @@ class _HomeActionButton extends StatelessWidget {
                         fontFamily: 'Outfit',
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
-                        color: isPrimary ? Colors.white : ZapalloTheme.textPrimary,
+                        color: isPrimary
+                            ? Colors.white
+                            : ZapalloTheme.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 2),
