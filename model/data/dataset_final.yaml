@@ -1,4 +1,6 @@
-# Dataset ZapalloAI — generado por preprocess.py
+# Dataset ZapalloAI — generado por Notebook 02
+# Fuentes: Cucurbit Leaf Disease Dataset + Sweet Pumpkin Disease Recognition
+
 path: C:/Users/csar_/Desktop/prototipo_zapallo/model/data/processed
 train: train
 val: val
