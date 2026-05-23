@@ -1,4 +1,4 @@
-# 🎃 ZapalloAI — Detector Móvil de Enfermedades Foliares en Zapallo
+#  ZapalloVision — Aplicación móvil para detectar enfermedades foliares en zapallo
 
 > Modelo inteligente basado en Redes Neuronales Convolucionales para la detección automática de enfermedades foliares en plantas de zapallo mediante una aplicación móvil.
 
