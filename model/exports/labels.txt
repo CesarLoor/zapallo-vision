@@ -1,0 +1,5 @@
+healthy
+downy_mildew
+leaf_curl
+mosaic_virus
+red_beetle

@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permisos: FUN-001, FUN-012 (HU-001, HU-012) -->
     <uses-permission android:name="android.permission.CAMERA" />
@@ -6,7 +7,8 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29" />
+        android:maxSdkVersion="29"
+        tools:replace="android:maxSdkVersion" />
     <!-- Almacenamiento para Android 13+ -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
