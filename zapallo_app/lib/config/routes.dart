@@ -1,9 +1,11 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../features/home/home_screen.dart';
 import '../features/capture/capture_screen.dart';
 import '../features/capture/preview_screen.dart';
 import '../features/gallery/gallery_screen.dart';
 import '../features/gallery/image_detail_screen.dart';
+import '../features/diagnosis/diagnosis_screen.dart';
 
 class AppRouter {
   static const String home = '/';
@@ -11,6 +13,7 @@ class AppRouter {
   static const String preview = '/preview';
   static const String gallery = '/gallery';
   static const String imageDetail = '/gallery/:id';
+  static const String diagnosis = '/diagnosis';
 
   static final router = GoRouter(
     initialLocation: home,
@@ -26,8 +29,16 @@ class AppRouter {
       GoRoute(
         path: preview,
         builder: (context, state) {
-          final imagePath = state.extra as String;
-          return PreviewScreen(imagePath: imagePath);
+          final extra = state.extra;
+          if (extra is! String || extra.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) context.go(home);
+            });
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return PreviewScreen(imagePath: extra);
         },
       ),
       GoRoute(
@@ -37,8 +48,46 @@ class AppRouter {
       GoRoute(
         path: imageDetail,
         builder: (context, state) {
-          final imageId = state.pathParameters['id']!;
+          final imageId = state.pathParameters['id'];
+          if (imageId == null || imageId.isEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) context.go(gallery);
+            });
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
           return ImageDetailScreen(imageId: imageId);
+        },
+      ),
+      GoRoute(
+        path: diagnosis,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is! Map) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) context.go(home);
+            });
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          final map = extra;
+          final imagePath = map['imagePath'];
+          final result = map['result'];
+          if (imagePath is! String || imagePath.isEmpty || result == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (context.mounted) context.go(home);
+            });
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return DiagnosisScreen(
+            imagePath: imagePath,
+            result: result,
+            validationReport: map['validationReport'],
+          );
         },
       ),
     ],

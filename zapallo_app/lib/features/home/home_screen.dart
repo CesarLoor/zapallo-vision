@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
 import '../../config/routes.dart';
+import '../../core/widgets/model_error_screen.dart';
+import '../../main.dart';
 
 /// Pantalla principal — punto de entrada de la app.
 /// Cumple RNF-001: flujo de max 3 pasos (Home → Cámara → Guardar)
@@ -10,6 +12,22 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (modelLoadFailed) {
+      return ModelErrorScreen(
+        errorMessage: modelLoadError,
+        onRetry: () async {
+          try {
+            await classifier.initialize();
+            modelLoadFailed = false;
+            modelLoadError = null;
+            if (context.mounted) (context as Element).markNeedsBuild();
+          } catch (e) {
+            modelLoadError = e.toString();
+          }
+        },
+      );
+    }
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(gradient: ZapalloTheme.heroGradient),

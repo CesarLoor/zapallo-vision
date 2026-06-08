@@ -22,7 +22,7 @@ class GalleryScreen extends StatelessWidget {
       create: (_) => GalleryCubit(
         db: db,
         storage: StorageService(db),
-      )..loadImages(),
+      )..loadImages()..watchImages(),
       child: const _GalleryView(),
     );
   }

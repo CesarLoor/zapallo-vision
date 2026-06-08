@@ -28,6 +28,7 @@ class PreviewScreen extends StatelessWidget {
           brightnessMax: AppConstants.brightnessMax,
         ),
         storage: StorageService(db),
+        classifier: classifier,
       )..validateImage(imagePath),
       child: _PreviewView(imagePath: imagePath),
     );
@@ -52,8 +53,15 @@ class _PreviewView extends StatelessWidget {
                 behavior: SnackBarBehavior.floating,
               ),
             );
-            // Volver al home después de guardar
             context.go(AppRouter.home);
+          }
+          if (state is CaptureClassified) {
+            // Ir a pantalla de diagnóstico
+            context.go(AppRouter.diagnosis, extra: {
+              'imagePath': state.imagePath,
+              'result': state.result,
+              'validationReport': state.validationReport,
+            });
           }
           if (state is CaptureError) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -127,14 +135,19 @@ class _PreviewView extends StatelessWidget {
                 ),
               ),
 
-              // ── Indicador de validación ───────────────────────────
-              if (state is CaptureValidating)
-                const Positioned(
+              // ── Indicador de validación/clasificación ────────────
+              if (state is CaptureValidating || state is CaptureClassifying)
+                Positioned(
                   top: 80,
                   left: 0,
                   right: 0,
                   child: Center(
-                    child: _ValidationChip(label: 'Analizando imagen...', isLoading: true),
+                    child: _ValidationChip(
+                      label: state is CaptureClassifying
+                          ? 'Analizando enfermedad...'
+                          : 'Validando calidad...',
+                      isLoading: true,
+                    ),
                   ),
                 ),
 
@@ -163,15 +176,17 @@ class _PreviewView extends StatelessWidget {
   }
 
   Widget _buildBottomContent(BuildContext context, CaptureState state) {
-    if (state is CaptureSaving) {
-      return const Center(
+    if (state is CaptureSaving || state is CaptureClassifying) {
+      return Center(
         child: Column(
           children: [
-            CircularProgressIndicator(color: Colors.white),
-            SizedBox(height: 12),
+            const CircularProgressIndicator(color: Colors.white),
+            const SizedBox(height: 12),
             Text(
-              'Guardando imagen...',
-              style: TextStyle(
+              state is CaptureClassifying
+                  ? 'Analizando hoja...'
+                  : 'Guardando...',
+              style: const TextStyle(
                 fontFamily: 'Outfit',
                 color: Colors.white,
                 fontSize: 15,
@@ -188,16 +203,14 @@ class _PreviewView extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // Fila de botones: Repetir | Guardar
         Row(
           children: [
-            // Botón repetir (HU-003, FUN-003)
             Expanded(
               child: OutlinedButton.icon(
                 key: const Key('btn_retake'),
                 onPressed: () {
                   context.read<CaptureCubit>().reset();
-                  context.pop(); // Vuelve a la cámara
+                  context.pop();
                 },
                 icon: const Icon(Icons.refresh_rounded, size: 20),
                 label: const Text('Repetir'),
@@ -209,19 +222,18 @@ class _PreviewView extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            // Botón guardar (HU-005, FUN-006)
             Expanded(
               flex: 2,
               child: ElevatedButton.icon(
-                key: const Key('btn_save'),
+                key: const Key('btn_analyze'),
                 onPressed: isValidated
-                    ? () => context.read<CaptureCubit>().saveImage(
+                    ? () => context.read<CaptureCubit>().classifyImage(
                           imagePath,
                           report!,
                         )
                     : null,
-                icon: const Icon(Icons.save_alt_rounded, size: 20),
-                label: const Text('Guardar imagen'),
+                icon: const Icon(Icons.analytics_outlined, size: 20),
+                label: const Text('Analizar Hoja'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: ZapalloTheme.primary,
                   padding: const EdgeInsets.symmetric(vertical: 14),

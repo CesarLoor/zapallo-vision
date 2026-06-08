@@ -33,6 +33,9 @@ dependencies:
   # Permisos
   permission_handler: ^11.3.1
 
+  # Inferencia TFLite on-device
+  tflite_flutter: ^0.11.0
+
   # State management
   flutter_bloc: ^9.0.0
   equatable: ^2.0.7

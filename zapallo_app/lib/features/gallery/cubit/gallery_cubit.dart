@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/services/storage_service.dart';
@@ -6,10 +7,12 @@ import 'gallery_state.dart';
 class GalleryCubit extends Cubit<GalleryState> {
   final AppDatabase _db;
   final StorageService _storage;
+  StreamSubscription<List<LeafImage>>? _imagesSubscription;
 
-  GalleryCubit({required this._db, required StorageService storage})
-    : _storage = storage,
-      super(const GalleryLoading());
+  GalleryCubit({required AppDatabase db, required StorageService storage})
+      : _db = db,
+        _storage = storage,
+        super(const GalleryLoading());
 
   /// Carga todas las imágenes — FUN-009
   Future<void> loadImages() async {
@@ -20,6 +23,23 @@ class GalleryCubit extends Cubit<GalleryState> {
     } catch (e) {
       emit(const GalleryError('Error al cargar las imágenes.'));
     }
+  }
+
+  /// Suscripción reactiva a la tabla para refresco automático
+  void watchImages() {
+    _imagesSubscription?.cancel();
+    _imagesSubscription = _db.watchAllImages().listen(
+      (images) {
+        if (!isClosed) {
+          emit(GalleryLoaded(images));
+        }
+      },
+      onError: (_) {
+        if (!isClosed) {
+          emit(const GalleryError('Error al cargar las imágenes.'));
+        }
+      },
+    );
   }
 
   /// Elimina una imagen — FUN-011
@@ -33,5 +53,11 @@ class GalleryCubit extends Cubit<GalleryState> {
       await loadImages();
     }
     return success;
+  }
+
+  @override
+  Future<void> close() async {
+    await _imagesSubscription?.cancel();
+    return super.close();
   }
 }

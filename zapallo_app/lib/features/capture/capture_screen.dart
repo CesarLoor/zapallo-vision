@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -118,6 +119,9 @@ class _CaptureScreenState extends State<CaptureScreen>
       final photo = await _controller!.takePicture();
 
       if (!mounted) return;
+
+      // Feedback háptico al capturar
+      HapticFeedback.mediumImpact();
 
       // Navegar a preview pasando la ruta del archivo
       context.push(AppRouter.preview, extra: photo.path);

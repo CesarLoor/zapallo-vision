@@ -25,6 +25,13 @@ class AppConstants {
   /// Brillo máximo permitido (sobreexposición)
   static const double brightnessMax = 225.0;
 
+  // ── Umbral de confianza del modelo ──────────────────────────────
+  /// Confianza mínima (0-1) para considerar confiable un diagnóstico.
+  /// Por debajo de este valor se muestra un banner de advertencia.
+  static const double minConfidenceThreshold = 0.6;
+  static const String msgLowConfidence =
+      'Baja confianza en el resultado. Considere tomar otra captura con mejor iluminación.';
+
   // ── Mensajes del sistema (SRS §3.4) ────────────────────────────
   static const String msgPermissionCamera =
       'Para capturar imágenes debe permitir el acceso a la cámara.';
@@ -42,4 +49,6 @@ class AppConstants {
   static const String msgNoImages = 'Aún no hay imágenes almacenadas.';
   static const String msgDeleteError =
       'No se pudo eliminar la imagen. Intente nuevamente.';
+  static const String msgAutoSaved = 'Guardado automáticamente';
+  static const String msgShareTitle = 'Diagnóstico ZapalloAI';
 }

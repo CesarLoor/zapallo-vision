@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
+import '../../config/disease_info.dart';
 import '../../core/database/app_database.dart';
 import '../../core/services/storage_service.dart';
 import '../../main.dart';
@@ -22,7 +24,7 @@ class ImageDetailScreen extends StatelessWidget {
       create: (_) => GalleryCubit(
         db: db,
         storage: StorageService(db),
-      )..loadImages(),
+      )..loadImages()..watchImages(),
       child: _ImageDetailView(imageId: imageId),
     );
   }
@@ -100,6 +102,7 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
       // ignore: use_build_context_synchronously
       final router = GoRouter.of(context);
 
+      HapticFeedback.mediumImpact();
       final success = await cubit.deleteImage(_image!);
       if (mounted) {
         if (success) {
@@ -120,6 +123,54 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
         }
       }
     }
+  }
+
+  void _shareDiagnosis() {
+    final image = _image;
+    if (image == null || image.diagnosisClass == null) return;
+
+    final info = DiseaseDatabase.getOrDefault(image.diagnosisClass!);
+    final conf = ((image.diagnosisConfidence ?? 0) * 100).toStringAsFixed(1);
+    final date = _dateFormat.format(image.capturedAt);
+
+    final text = StringBuffer()
+      ..writeln('🌱 ${AppConstants.msgShareTitle}')
+      ..writeln()
+      ..writeln('📅 Fecha: $date')
+      ..writeln('🍂 Enfermedad: ${info.labelEs}')
+      ..writeln('📊 Confianza: $conf%')
+      ..writeln('⚠️ Severidad: ${info.severityLabel}')
+      ..writeln()
+      ..writeln('📝 ${info.description}')
+      ..writeln();
+
+    if (info.symptoms.isNotEmpty) {
+      text.writeln(info.isHealthy ? '✅ Características:' : '🔍 Síntomas:');
+      for (final s in info.symptoms) {
+        text.writeln('  • $s');
+      }
+      text.writeln();
+    }
+
+    if (info.recommendations.isNotEmpty) {
+      text.writeln('💡 Recomendaciones:');
+      for (var i = 0; i < info.recommendations.length; i++) {
+        text.writeln('  ${i + 1}. ${info.recommendations[i]}');
+      }
+      text.writeln();
+    }
+
+    text.writeln('— Generado por ZapalloAI v${AppConstants.appVersion}');
+
+    HapticFeedback.selectionClick();
+    Clipboard.setData(ClipboardData(text: text.toString()));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Diagnóstico copiado al portapapeles'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -156,6 +207,13 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
               onPressed: () => context.pop(),
             ),
             actions: [
+              if (image.diagnosisClass != null)
+                IconButton(
+                  key: const Key('btn_share_image'),
+                  icon: const Icon(Icons.share_outlined, color: Colors.white),
+                  onPressed: _shareDiagnosis,
+                  tooltip: 'Compartir diagnóstico',
+                ),
               IconButton(
                 key: const Key('btn_delete_image'),
                 icon: const Icon(Icons.delete_outline_rounded,
@@ -219,6 +277,33 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
                     value: _dateFormat.format(image.capturedAt),
                   ),
                   const Divider(height: 24),
+
+                  // Diagnóstico (si existe)
+                  if (image.diagnosisClass != null) ...[
+                    const Text(
+                      'Resultado del diagnóstico',
+                      style: TextStyle(
+                        fontFamily: 'Outfit',
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: ZapalloTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _InfoRow(
+                      icon: Icons.analytics_rounded,
+                      label: 'Enfermedad detectada',
+                      value: image.diagnosisLabel ?? 'Desconocida',
+                      valueColor: ZapalloTheme.primary,
+                    ),
+                    const SizedBox(height: 12),
+                    _InfoRow(
+                      icon: Icons.percent_rounded,
+                      label: 'Confianza',
+                      value: '${((image.diagnosisConfidence ?? 0) * 100).toStringAsFixed(1)}%',
+                    ),
+                    const Divider(height: 24),
+                  ],
 
                   // ID — FUN-007
                   _InfoRow(

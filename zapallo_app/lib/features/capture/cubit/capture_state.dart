@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../../core/services/image_validator.dart';
+import '../../../core/services/classifier_service.dart';
 
 abstract class CaptureState extends Equatable {
   const CaptureState();
@@ -39,4 +40,17 @@ class CaptureError extends CaptureState {
   const CaptureError(this.message);
   @override
   List<Object?> get props => [message];
+}
+
+class CaptureClassifying extends CaptureState {
+  const CaptureClassifying();
+}
+
+class CaptureClassified extends CaptureState {
+  final String imagePath;
+  final ClassificationResult result;
+  final ImageValidationReport validationReport;
+  const CaptureClassified({required this.imagePath, required this.result, required this.validationReport});
+  @override
+  List<Object?> get props => [imagePath, result, validationReport];
 }

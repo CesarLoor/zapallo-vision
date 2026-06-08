@@ -41,6 +41,9 @@ class StorageService {
   Future<SaveResult> saveImage({
     required String sourcePath,
     ImageValidationReport? validationReport,
+    String? diagnosisClass,
+    String? diagnosisLabel,
+    double? diagnosisConfidence,
   }) async {
     try {
       // 1. Crear carpeta de destino si no existe
@@ -71,6 +74,9 @@ class StorageService {
           fileSize: Value(fileSize),
           blurScore: Value(validationReport?.blurScore),
           brightnessScore: Value(validationReport?.brightnessScore),
+          diagnosisClass: Value(diagnosisClass),
+          diagnosisLabel: Value(diagnosisLabel),
+          diagnosisConfidence: Value(diagnosisConfidence),
         ),
       );
 
