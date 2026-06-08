@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.espe.zapalloai.zapallo_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36  // Android 16 (API 36) para Samsung S25+
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -20,7 +20,7 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = maxOf(flutter.minSdkVersion, 21)  // tensorflow-lite requires API 21+
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36  // Android 16 (API 36) para Samsung S25+
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

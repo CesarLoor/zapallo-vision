@@ -46,10 +46,16 @@ class StorageService {
     double? diagnosisConfidence,
   }) async {
     try {
-      // 1. Crear carpeta de destino si no existe
+      // 1. Validar que el archivo origen existe
+      final sourceFile = File(sourcePath);
+      if (!await sourceFile.exists()) {
+        return SaveResult.failure('El archivo origen no existe: $sourcePath');
+      }
+
+      // 2. Crear carpeta de destino si no existe
       final destFolder = await _getImagesDirectory();
 
-      // 2. Generar nombre único: zapallo_20260521_143022_<uuid8>.jpg
+      // 3. Generar nombre único: zapallo_20260521_143022_<uuid8>.jpg
       final id = _uuid.v4();
       final shortId = id.replaceAll('-', '').substring(0, 8);
       final timestamp = _dateFormat.format(DateTime.now());
@@ -57,15 +63,19 @@ class StorageService {
           '${AppConstants.imageNamePrefix}_${timestamp}_$shortId${AppConstants.imageExtension}';
       final destPath = p.join(destFolder.path, fileName);
 
-      // 3. Copiar archivo al destino permanente
-      final sourceFile = File(sourcePath);
+      // 4. Copiar archivo al destino permanente
       await sourceFile.copy(destPath);
 
-      // 4. Obtener información del archivo
+      // 5. Verificar que la copia se realizó correctamente
       final destFile = File(destPath);
+      if (!await destFile.exists()) {
+        return SaveResult.failure('No se pudo copiar el archivo a $destPath');
+      }
+
+      // 6. Obtener información del archivo
       final fileSize = await destFile.length();
 
-      // 5. Registrar en base de datos
+      // 7. Registrar en base de datos
       await _db.insertImage(
         LeafImagesCompanion(
           id: Value(id),
@@ -81,6 +91,9 @@ class StorageService {
       );
 
       return SaveResult.success(id);
+    } on FileSystemException catch (e) {
+      return SaveResult.failure(
+          '${AppConstants.msgImageSaveError}: ${e.message}');
     } catch (e) {
       return SaveResult.failure(AppConstants.msgImageSaveError);
     }
