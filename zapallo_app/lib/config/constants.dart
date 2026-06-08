@@ -18,12 +18,16 @@ class AppConstants {
   /// Varianza del Laplaciano mínima (blur detection).
   /// Valores < umbral = imagen borrosa.
   /// Calibrar con imágenes reales de campo.
+  /// NOTA: Estos valores pueden necesitar ajuste según condiciones de iluminación reales.
   static const double blurThreshold = 80.0;
 
   /// Brillo mínimo (0-255) de la imagen en escala de grises
   static const double brightnessMin = 35.0;
   /// Brillo máximo permitido (sobreexposición)
   static const double brightnessMax = 225.0;
+  
+  /// Tamaño mínimo de imagen aceptable (ancho y alto en píxeles)
+  static const int minImageSize = 10;
 
   // ── Umbral de confianza del modelo ──────────────────────────────
   /// Confianza mínima (0-1) para considerar confiable un diagnóstico.

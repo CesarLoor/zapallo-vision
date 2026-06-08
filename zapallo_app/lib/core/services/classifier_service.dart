@@ -30,6 +30,10 @@ class ClassifierService {
   static const String _modelAsset = 'assets/models/best_int8.tflite';
   static const String _labelsAsset = 'assets/models/labels.txt';
   static const int _inputSize = 224;
+  
+  // Hacer públicos para verificación en main.dart
+  static String get modelAsset => _modelAsset;
+  static String get labelsAsset => _labelsAsset;
 
   Interpreter? _interpreter;
   List<String> _labels = [];
@@ -70,14 +74,26 @@ class ClassifierService {
           'ClassifierService no inicializado. Llama a initialize() primero.');
     }
 
-    // 1. Leer y decodificar la imagen
-    final imageBytes = await File(imagePath).readAsBytes();
+    // 1. Validar que el archivo existe
+    final file = File(imagePath);
+    if (!await file.exists()) {
+      throw ArgumentError('El archivo de imagen no existe: $imagePath');
+    }
+
+    // 2. Leer y decodificar la imagen
+    final imageBytes = await file.readAsBytes();
     final image = img.decodeImage(imageBytes);
     if (image == null) {
       throw ArgumentError('No se pudo decodificar la imagen: $imagePath');
     }
 
-    // 2. Pre-procesar: resize a 224x224
+    // 3. Validar tamaño mínimo de imagen
+    if (image.width < 10 || image.height < 10) {
+      throw ArgumentError(
+          'Imagen demasiado pequeña (${image.width}x${image.height}). Se requiere al menos 10x10 píxeles.');
+    }
+
+    // 4. Pre-procesar: resize a 224x224
     final resized = img.copyResize(image, width: _inputSize, height: _inputSize);
 
     // 3. Determinar el tipo de entrada del modelo

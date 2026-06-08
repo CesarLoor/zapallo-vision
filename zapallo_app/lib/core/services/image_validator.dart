@@ -36,10 +36,28 @@ class ImageValidator {
   /// Valida una imagen desde su ruta de archivo.
   /// Retorna [ValidationResult] y las métricas calculadas.
   Future<ImageValidationReport> validate(String imagePath) async {
-    final bytes = await File(imagePath).readAsBytes();
+    final file = File(imagePath);
+    if (!await file.exists()) {
+      return ImageValidationReport(
+        result: ValidationResult.blurry,
+        blurScore: 0,
+        brightnessScore: 0,
+      );
+    }
+
+    final bytes = await file.readAsBytes();
     final image = img.decodeImage(bytes);
 
     if (image == null) {
+      return ImageValidationReport(
+        result: ValidationResult.blurry,
+        blurScore: 0,
+        brightnessScore: 0,
+      );
+    }
+
+    // Validar tamaño mínimo
+    if (image.width < 10 || image.height < 10) {
       return ImageValidationReport(
         result: ValidationResult.blurry,
         blurScore: 0,

@@ -33,6 +33,13 @@ Future<void> main() async {
   // Inicializar modelo
   classifier = ClassifierService();
   try {
+    // Verificar que el archivo del modelo existe antes de inicializar
+    final modelExists = await _checkAssetExists(ClassifierService.modelAsset);
+    if (!modelExists) {
+      throw StateError(
+          'El archivo del modelo no existe: ${ClassifierService.modelAsset}');
+    }
+    
     await classifier.initialize();
   } catch (e, st) {
     modelLoadFailed = true;
@@ -41,4 +48,14 @@ Future<void> main() async {
   }
 
   runApp(const ZapalloApp());
+}
+
+/// Verifica si un asset existe cargándolo
+Future<bool> _checkAssetExists(String assetPath) async {
+  try {
+    await rootBundle.load(assetPath);
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
