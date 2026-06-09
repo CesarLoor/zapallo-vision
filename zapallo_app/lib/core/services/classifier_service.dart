@@ -93,8 +93,14 @@ class ClassifierService {
           'Imagen demasiado pequeña (${image.width}x${image.height}). Se requiere al menos 10x10 píxeles.');
     }
 
-    // 4. Pre-procesar: resize a 224x224
-    final resized = img.copyResize(image, width: _inputSize, height: _inputSize);
+    // 4. Pre-procesar: recortar a cuadrado + resize a 224x224
+    final size = math.min(image.width, image.height);
+    final cropped = img.copyCrop(image,
+        x: (image.width - size) ~/ 2,
+        y: (image.height - size) ~/ 2,
+        width: size,
+        height: size);
+    final resized = img.copyResize(cropped, width: _inputSize, height: _inputSize);
 
     // 3. Determinar el tipo de entrada del modelo
     final inputTensor = _interpreter!.getInputTensor(0);
@@ -103,8 +109,8 @@ class ClassifierService {
 
     // 4. Preparar buffer de entrada según tipo
     // El tensor del modelo es 4D [1, h, w, 3]; el plugin tflite_flutter
-    // acepta un buffer PLANO (1*h*w*3) de tipo Float32List o Uint8List.
-    // No envolver en List, o se interpretará como tensor 2D.
+    // acepta raw bytes (Uint8List). NO pasar Float32List plano porque
+    // el plugin lo interpreta como 1D [150528] y redimensiona el tensor.
     Object input;
     if (inputType == TensorType.uint8) {
       input = _imageToUint8Buffer(resized, inputShape);
@@ -120,13 +126,13 @@ class ClassifierService {
     Object output;
     if (outputType == TensorType.uint8) {
       output = List.generate(outputShape[0],
-          (_) => Uint8List(outputShape[1]));
+          (_) => List<int>.filled(outputShape[1], 0));
     } else if (outputType == TensorType.int8) {
       output = List.generate(outputShape[0],
-          (_) => Int8List(outputShape[1]));
+          (_) => List<int>.filled(outputShape[1], 0));
     } else {
       output = List.generate(outputShape[0],
-          (_) => Float32List(outputShape[1]));
+          (_) => List<double>.filled(outputShape[1], 0.0));
     }
 
     // 6. Ejecutar inferencia
@@ -135,20 +141,20 @@ class ClassifierService {
     // 7. Extraer probabilidades
     List<double> scores;
     if (outputType == TensorType.uint8) {
-      final raw = (output as List<Uint8List>)[0];
+      final raw = (output as List<List<int>>)[0];
       // Dequantize: (value - zeroPoint) * scale
       final params = outputTensor.params;
       scores = raw
           .map((v) => (v - params.zeroPoint) * params.scale)
           .toList();
     } else if (outputType == TensorType.int8) {
-      final raw = (output as List<Int8List>)[0];
+      final raw = (output as List<List<int>>)[0];
       final params = outputTensor.params;
       scores = raw
           .map((v) => (v - params.zeroPoint) * params.scale)
           .toList();
     } else {
-      scores = (output as List<Float32List>)[0].toList();
+      scores = (output as List<List<double>>)[0];
     }
 
     // 8. Aplicar softmax solo si los valores NO son ya probabilidades
@@ -179,13 +185,14 @@ class ClassifierService {
     );
   }
 
-  /// Convierte la imagen a un buffer Float32 normalizado [0, 1] PLANO
+  /// Convierte la imagen a raw bytes de float32 normalizados [0, 1]
   ///
   /// El modelo `best_int8.tflite` es "weight-only int8" (quantization híbrida):
   /// los pesos están cuantizados en int8, pero las activaciones siguen en float32.
   /// El tensor de entrada es 4D [1, h, w, 3] = 1*h*w*3 = 150528 elementos.
-  /// El plugin tflite_flutter requiere un Float32List PLANO (no envuelto en List).
-  Float32List _imageToFloat32Buffer(img.Image image, List<int> shape) {
+  /// Devolvemos Uint8List (raw bytes) para que tflite_flutter NO intente
+  /// redimensionar el tensor (el plugin lo trata como 1D si recibe Float32List).
+  Uint8List _imageToFloat32Buffer(img.Image image, List<int> shape) {
     final h = shape[1];
     final w = shape[2];
     final buffer = Float32List(1 * h * w * 3);
@@ -198,7 +205,7 @@ class ClassifierService {
         buffer[idx++] = pixel.b.toDouble() / 255.0;
       }
     }
-    return buffer;
+    return buffer.buffer.asUint8List();
   }
 
   /// Convierte la imagen a un buffer Uint8 [0, 255] PLANO

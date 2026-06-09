@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).\
         applicationId = "com.espe.zapalloai.zapallo_app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -23,6 +23,12 @@ android {
         targetSdk = 36  // Android 16 (API 36) para Samsung S25+
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Solo ARM 64-bit: reduce el APK ~50% y acelera el build
+        // Samsung S25+, Pixel 6+ y emuladores arm64 son todos 64-bit
+        ndk {
+            abiFilters += listOf("arm64-v8a")
+        }
     }
 
     buildTypes {

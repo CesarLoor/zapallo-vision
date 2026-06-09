@@ -7,7 +7,8 @@ import '../../config/routes.dart';
 import '../../config/constants.dart';
 import '../../core/services/image_validator.dart';
 import '../../core/services/storage_service.dart';
-import '../../main.dart';
+import '../../app.dart';
+import '../../main.dart' show db;
 import 'cubit/capture_cubit.dart';
 import 'cubit/capture_state.dart';
 
@@ -20,6 +21,7 @@ class PreviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final clf = ClassifierProvider.of(context);
     return BlocProvider(
       create: (_) => CaptureCubit(
         validator: const ImageValidator(
@@ -28,7 +30,7 @@ class PreviewScreen extends StatelessWidget {
           brightnessMax: AppConstants.brightnessMax,
         ),
         storage: StorageService(db),
-        classifier: classifier,
+        classifier: clf,
       )..validateImage(imagePath),
       child: _PreviewView(imagePath: imagePath),
     );

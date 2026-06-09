@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../app.dart';
 import '../../config/theme.dart';
 import '../../config/routes.dart';
-import '../../core/widgets/model_error_screen.dart';
-import '../../main.dart';
 
 /// Pantalla principal — punto de entrada de la app.
 /// Cumple RNF-001: flujo de max 3 pasos (Home → Cámara → Guardar)
@@ -12,22 +11,8 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (modelLoadFailed) {
-      return ModelErrorScreen(
-        errorMessage: modelLoadError,
-        onRetry: () async {
-          try {
-            await classifier.initialize();
-            modelLoadFailed = false;
-            modelLoadError = null;
-            if (context.mounted) (context as Element).markNeedsBuild();
-          } catch (e) {
-            modelLoadError = e.toString();
-          }
-        },
-      );
-    }
-
+    final clf = ClassifierProvider.of(context);
+    final modelReady = clf.isReady;
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(gradient: ZapalloTheme.heroGradient),
@@ -85,6 +70,38 @@ class HomeScreen extends StatelessWidget {
               ),
 
               const Spacer(),
+
+              // Banner si el modelo no cargó (degraded mode)
+              if (!modelReady)
+                Container(
+                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: ZapalloTheme.warning.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: ZapalloTheme.warning.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded,
+                          color: ZapalloTheme.warning, size: 18),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Modelo de IA no disponible. La clasificación no funcionará.',
+                          style: TextStyle(
+                            fontFamily: 'Outfit',
+                            fontSize: 12,
+                            color: ZapalloTheme.warning,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
               // ── Tarjeta de acciones ───────────────────────────────
               Container(
