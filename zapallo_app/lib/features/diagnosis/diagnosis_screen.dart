@@ -7,9 +7,9 @@ import '../../config/constants.dart';
 import '../../config/disease_info.dart';
 import '../../config/routes.dart';
 import '../../core/services/classifier_service.dart';
-import '../../core/services/storage_service.dart';
 import '../../core/services/image_validator.dart';
-import '../../main.dart';
+import '../../core/repositories/capture_repository.dart';
+import '../../core/di/service_locator.dart';
 
 /// Pantalla de resultados del diagnóstico — HU-006, HU-007
 /// Muestra la enfermedad detectada, confianza, síntomas y recomendaciones.
@@ -59,7 +59,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen>
 
     // Auto-guardado silencioso al entrar
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _autoSave();
+      _save(isAuto: true);
     });
   }
 
@@ -69,51 +69,13 @@ class _DiagnosisScreenState extends State<DiagnosisScreen>
     super.dispose();
   }
 
-  Future<void> _autoSave() async {
+  Future<void> _save({bool isAuto = false}) async {
     if (_isSaving || _saved) return;
     setState(() => _isSaving = true);
 
     try {
-      final storage = StorageService(db);
-      final saveResult = await storage.saveImage(
-        sourcePath: widget.imagePath,
-        validationReport: widget.validationReport,
-        diagnosisClass: widget.result.classKey,
-        diagnosisLabel: _disease.labelEs,
-        diagnosisConfidence: widget.result.confidence,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _saved = saveResult.success;
-        _autoSaved = saveResult.success;
-        _isSaving = false;
-      });
-
-      if (saveResult.success) {
-        HapticFeedback.lightImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(AppConstants.msgAutoSaved),
-            duration: const Duration(seconds: 2),
-            backgroundColor: ZapalloTheme.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (_) {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-
-  Future<void> _saveResult() async {
-    if (_isSaving || _saved) return;
-    setState(() => _isSaving = true);
-
-    try {
-      final storage = StorageService(db);
-      final saveResult = await storage.saveImage(
+      final repo = sl<CaptureRepository>();
+      final saveResult = await repo.saveImage(
         sourcePath: widget.imagePath,
         validationReport: widget.validationReport,
         diagnosisClass: widget.result.classKey,
@@ -124,14 +86,20 @@ class _DiagnosisScreenState extends State<DiagnosisScreen>
       if (!mounted) return;
 
       if (saveResult.success) {
-        HapticFeedback.mediumImpact();
+        if (isAuto) {
+          HapticFeedback.lightImpact();
+        } else {
+          HapticFeedback.mediumImpact();
+        }
         setState(() {
           _saved = true;
+          _autoSaved = isAuto;
           _isSaving = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Resultado guardado correctamente'),
+            content: Text(isAuto ? AppConstants.msgAutoSaved : 'Resultado guardado correctamente'),
+            duration: Duration(seconds: isAuto ? 2 : 3),
             backgroundColor: ZapalloTheme.success,
             behavior: SnackBarBehavior.floating,
           ),
@@ -433,7 +401,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen>
                           child: ElevatedButton.icon(
                             key: const Key('btn_save_diagnosis'),
                             onPressed:
-                                _saved || _isSaving ? null : _saveResult,
+                                _saved || _isSaving ? null : () => _save(),
                             icon: Icon(
                               _saved
                                   ? Icons.check_rounded

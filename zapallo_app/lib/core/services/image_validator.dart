@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 
 /// Resultado de la validación de imagen
@@ -72,8 +73,9 @@ class ImageValidator {
 
     final grayscale = img.grayscale(resized);
 
-    final blurScore = _computeLaplacianVariance(grayscale);
-    final brightnessScore = _computeAverageBrightness(grayscale);
+    final metrics = await _computeImageMetrics(grayscale);
+    final blurScore = metrics.blurScore;
+    final brightnessScore = metrics.brightnessScore;
 
     ValidationResult result;
 
@@ -94,61 +96,70 @@ class ImageValidator {
     );
   }
 
-  // ── Cálculo de varianza del Laplaciano ─────────────────────────
-  /// Un valor bajo indica imagen borrosa.
-  /// Kernel Laplaciano 3x3: [0,1,0,1,-4,1,0,1,0]
-  double _computeLaplacianVariance(img.Image gray) {
+  /// Ejecuta ambos cálculos (Laplaciano + brillo) en un isolate separado.
+  Future<_ImageMetrics> _computeImageMetrics(img.Image gray) async {
     final w = gray.width;
     final h = gray.height;
+    if (w < 3 || h < 3) return _ImageMetrics(0.0, 0.0);
 
-    if (w < 3 || h < 3) return 0.0;
-
-    // Extraer valores de gris en lista plana
-    final pixels = List<double>.generate(w * h, (i) {
-      final x = i % w;
-      final y = i ~/ w;
-      return img.getLuminance(gray.getPixel(x, y)).toDouble();
-    });
-
-    // Aplicar Laplaciano
-    double sum = 0;
-    double sumSq = 0;
-    int count = 0;
-
-    for (int y = 1; y < h - 1; y++) {
-      for (int x = 1; x < w - 1; x++) {
-        final lap = pixels[(y - 1) * w + x] +
-            pixels[(y + 1) * w + x] +
-            pixels[y * w + (x - 1)] +
-            pixels[y * w + (x + 1)] -
-            4 * pixels[y * w + x];
-        sum += lap;
-        sumSq += lap * lap;
-        count++;
-      }
+    final pixels = Float64List(w * h);
+    for (int i = 0; i < w * h; i++) {
+      pixels[i] = img.getLuminance(gray.getPixel(i % w, i ~/ w)).toDouble();
     }
+    return compute(_metricsHelper, _MetricsArgs(pixels, w, h));
+  }
+}
 
-    if (count == 0) return 0.0;
+// ── Funciones top-level para compute() ──────────────────────────────
 
-    final mean = sum / count;
-    final variance = sumSq / count - mean * mean;
-    return math.max(0.0, variance);
+class _MetricsArgs {
+  final Float64List pixels;
+  final int width;
+  final int height;
+  const _MetricsArgs(this.pixels, this.width, this.height);
+}
+
+class _ImageMetrics {
+  final double blurScore;
+  final double brightnessScore;
+  const _ImageMetrics(this.blurScore, this.brightnessScore);
+}
+
+_ImageMetrics _metricsHelper(_MetricsArgs args) {
+  final pixels = args.pixels;
+  final w = args.width;
+  final h = args.height;
+
+  // Laplaciano
+  double sum = 0;
+  double sumSq = 0;
+  int count = 0;
+
+  for (int y = 1; y < h - 1; y++) {
+    for (int x = 1; x < w - 1; x++) {
+      final lap = pixels[(y - 1) * w + x] +
+          pixels[(y + 1) * w + x] +
+          pixels[y * w + (x - 1)] +
+          pixels[y * w + (x + 1)] -
+          4 * pixels[y * w + x];
+      sum += lap;
+      sumSq += lap * lap;
+      count++;
+    }
   }
 
-  // ── Cálculo de brillo promedio ─────────────────────────────────
-  double _computeAverageBrightness(img.Image gray) {
-    double total = 0;
-    final w = gray.width;
-    final h = gray.height;
+  final variance = count > 0
+      ? math.max(0.0, sumSq / count - (sum / count) * (sum / count))
+      : 0.0;
 
-    for (int y = 0; y < h; y++) {
-      for (int x = 0; x < w; x++) {
-        total += img.getLuminance(gray.getPixel(x, y));
-      }
-    }
-
-    return total / (w * h);
+  // Brillo promedio
+  double total = 0;
+  for (int i = 0; i < pixels.length; i++) {
+    total += pixels[i];
   }
+  final avgBrightness = total / pixels.length;
+
+  return _ImageMetrics(variance, avgBrightness);
 }
 
 /// Reporte de validación con métricas

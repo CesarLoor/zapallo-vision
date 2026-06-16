@@ -1,75 +1,136 @@
-# ML Pipeline - ZapalloAI
+# ZapalloAI — Pipeline de ML
 
-Este directorio contiene todo el pipeline de Machine Learning para el entrenamiento y exportación del modelo de detección de enfermedades foliares en zapallo.
+Clasificador de enfermedades foliares en zapallo usando YOLOv11n-cls.
 
 ## Estructura
 
 ```
 model/
-├── notebooks/
-│   ├── 01_exploracion_datos.ipynb      # EDA: distribución, resolución, duplicados
-│   ├── 02_preprocesamiento.ipynb       # Unificar datasets, split, augmentation
-│   ├── 03_entrenamiento_yolov11.ipynb  # Fine-tuning YOLOv11n-cls
-│   ├── 04_evaluacion_metricas.ipynb    # Confusion matrix, F1, per-class
-│   └── 05_exportacion_tflite.ipynb     # Export TFLite float32 + int8
+├── config.py              # Configuración centralizada (rutas, clases, hiperparámetros)
+├── requirements.txt       # Dependencias Python
+├── pyproject.toml         # Ruff + mypy config
+├── .gitignore
 ├── data/
-│   ├── raw/                            # Datasets descargados (no versionados)
-│   │   ├── sweet_pumpkin/              # 7,000 imgs (Mendeley Data)
-│   │   └── cucurbit_leaf/              # 4,121 imgs (Mendeley Data)
-│   ├── processed/                      # Dataset unificado (no versionado)
-│   │   ├── train/
-│   │   ├── val/
-│   │   └── test/
-│   └── dataset.yaml                    # Config YOLO
-├── runs/                               # Outputs de entrenamiento (no versionados)
-├── exports/                            # Modelos exportados
-├── requirements.txt
-└── README.md
+│   ├── raw/               # Datasets originales (no versionados) — descargar de Mendeley
+│   ├── processed/         # Dataset unificado procesado (generado por preprocess.py)
+│   ├── dataset.yaml       # Config YOLO manual
+│   └── dataset_final.yaml # Config YOLO generada por preprocess.py
+├── scripts/
+│   ├── preprocess.py      # Preprocesamiento: unificación, dedup, split, augment
+│   ├── train.py           # Entrenamiento YOLO + export TFLite
+│   └── count_images.py    # Utilidad: conteo de imágenes
+├── notebooks/
+│   ├── 01_exploracion_datos.ipynb
+│   ├── 02_preprocesamiento.ipynb
+│   └── 03_entrenamiento_yolov11.ipynb
+├── exports/               # Modelos exportados (best_int8.tflite, labels.txt)
+└── runs/                  # Outputs de entrenamiento YOLO
 ```
+
+## Pipeline
+
+```
+Raw datasets (Mendeley)
+    │
+    ▼
+preprocess.py ──► Unifica, deduplica (pHash), split (70/15/15),
+    │               augmenta clases minoritarias, genera dataset_final.yaml
+    ▼
+train.py ──► YOLOv11n-cls (ImageNet pretrained), exporta TFLite int8,
+    │           genera labels.txt, copia a assets de Flutter
+    ▼
+zapallo_app/assets/models/best_int8.tflite + labels.txt
+```
+
+## Clases (orden alfabético = orden YOLO)
+
+| Índice | Clase          | Enfermedad                   |
+|--------|----------------|------------------------------|
+| 0      | downy_mildew   | Mildiú velloso               |
+| 1      | healthy        | Hoja sana                    |
+| 2      | leaf_curl      | Virus de la hoja rizada      |
+| 3      | mosaic_virus   | Virus del mosaico             |
+| 4      | red_beetle     | Daño por escarabajo rojo      |
+
+**Importante:** YOLOv11n-cls asigna índices según el orden alfabético de las
+carpetas. `labels.txt` debe mantener este orden para que la app Flutter
+interprete correctamente las predicciones.
+
+## Uso
+
+```bash
+# 1. Instalar dependencias
+pip install -r model/requirements.txt
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+# 2. Descargar datasets raw (ver sección abajo)
+
+# 3. Preprocesar
+python model/scripts/preprocess.py
+
+# 4. Entrenar
+python model/scripts/train.py --epochs 100
+
+# 5. Ver resultados en:
+#    model/exports/best_int8.tflite
+#    model/exports/labels.txt
+```
+
+### Opciones de train.py
+
+| Flag              | Descripción                           | Default  |
+|-------------------|---------------------------------------|----------|
+| `--epochs N`      | Número de épocas                      | 100      |
+| `--batch N`       | Batch size (0 = auto según VRAM)      | 0 (auto) |
+| `--resume`        | Reanudar desde último checkpoint       | —        |
+| `--export-only`   | Solo exportar TFLite desde best.pt     | —        |
+| `--run-name NAME` | Nombre del run de entrenamiento        | zapallo_yolov11n |
+| `--amp`           | Activar AMP (no recomendado GTX 1650) | False    |
 
 ## Datasets
 
-| Dataset | Imágenes | Clases | Fuente |
-|---|---|---|---|
-| Sweet Pumpkin Disease Recognition | 7,000 (aug) | 5 | Mendeley Data |
-| Cucurbit Leaf Disease Dataset | 4,121 (aug) | 4 | Mendeley Data |
+Descargar de Mendeley Data y extraer en `model/data/raw/`:
 
-### Mapeo de clases unificado
+- **Cucurbit Leaf Disease Dataset** (4,121 imágenes, 4 clases)
+  - https://data.mendeley.com/datasets/k5bchnz7z8/1
+- **Sweet Pumpkin Disease Recognition** (7,000 imágenes, 5 clases)
+  - https://data.mendeley.com/datasets/3rvmynrctn/1
 
-| Clase | Sweet Pumpkin | Cucurbit Leaf |
-|---|---|---|
-| `healthy` | Sana | Sanas |
-| `downy_mildew` | Mildiu | Mildiu velloso |
-| `leaf_curl` | Enrollamiento foliar | Virus del enrollamiento |
-| `mosaic_virus` | Mosaico | Mosaico |
-| `red_beetle` | Escarabajo rojo | — |
+Estructura esperada después de extraer:
 
-## Uso en Google Colab
+```
+model/data/raw/
+├── Cucurbit_leaf/
+│   ├── Downy mildew/
+│   ├── Healthy/
+│   ├── Leaf curl disease/
+│   └── Mosaic virus/
+└── sweet_pumpkin/
+    └── Augmented Images/
+        ├── Augmented Sweet Pumpkin Downy Mildew Disease/
+        ├── Augmented Sweet Pumpkin Healthy Leaf/
+        ├── Augmented Sweet Pumpkin Leaf Curl Disease/
+        ├── Augmented Sweet Pumpkin Mosaic Disease/
+        └── Augmented Sweet Pumpkin Red Beetle/
+```
 
-1. Subir los datasets a Google Drive
-2. Abrir cada notebook en Colab
-3. Conectar con GPU (T4 o superior)
-4. Ejecutar las celdas secuencialmente
+## Exportación TFLite
 
-## Entrenamiento rápido
+`train.py` ejecuta automáticamente `model.export(format='tflite', int8=True)`
+y copia los archivos a `model/exports/` y a `zapallo_app/assets/models/`.
+
+Para exportación manual (notebook o troubleshooting):
 
 ```python
 from ultralytics import YOLO
-
-model = YOLO('yolo11n-cls.pt')
-results = model.train(
-    data='data/processed',
-    epochs=100,
-    imgsz=224,
-    batch=32,
-    patience=15,
-    optimizer='AdamW',
-)
+model = YOLO('model/runs/classify/zapallo_yolov11n/weights/best.pt')
+model.export(format='tflite', int8=True, imgsz=224)
 ```
 
-## Exportación a TFLite
+## Calidad de código
 
-```python
-model = YOLO('runs/classify/train/weights/best.pt')
-model.export(format='tflite', int8=True, imgsz=224)
+```bash
+pip install ruff mypy
+ruff check model/scripts/ model/config.py
+mypy model/scripts/ model/config.py
 ```

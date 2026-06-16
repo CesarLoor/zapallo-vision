@@ -1,16 +1,14 @@
-# Dataset ZapalloAI — generado por Notebook 02 OPTIMIZADO
-# Fuentes: Cucurbit Leaf Disease Dataset + Sweet Pumpkin Disease Recognition
-# Preprocesamiento paralelo (8 workers, ProcessPoolExecutor)
-
-path: C:/Users/csar_/Desktop/prototipo_zapallo/model/data/processed
+# Dataset ZapalloAI — generado por preprocess.py
+# Clases en orden alfabético (coincide con YOLO)
+path: ./processed
 train: train
 val: val
 test: test
 
 nc: 5
 names:
-  0: healthy
-  1: downy_mildew
+  0: downy_mildew
+  1: healthy
   2: leaf_curl
   3: mosaic_virus
   4: red_beetle

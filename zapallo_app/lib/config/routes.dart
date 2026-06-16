@@ -5,6 +5,7 @@ import '../features/capture/capture_screen.dart';
 import '../features/capture/preview_screen.dart';
 import '../features/gallery/gallery_screen.dart';
 import '../features/gallery/image_detail_screen.dart';
+import '../features/gallery/cubit/gallery_cubit.dart';
 import '../features/diagnosis/diagnosis_screen.dart';
 
 class AppRouter {
@@ -57,7 +58,8 @@ class AppRouter {
               body: Center(child: CircularProgressIndicator()),
             );
           }
-          return ImageDetailScreen(imageId: imageId);
+          final cubit = state.extra is GalleryCubit ? state.extra as GalleryCubit : null;
+          return ImageDetailScreen(imageId: imageId, cubit: cubit);
         },
       ),
       GoRoute(

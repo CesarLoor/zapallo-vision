@@ -41,6 +41,13 @@ class AppDatabase extends _$AppDatabase {
   Future<int> deleteImage(String id) =>
       (delete(leafImages)..where((t) => t.id.equals(id))).go();
 
+  /// Obtiene imágenes paginadas
+  Future<List<LeafImage>> getImagesPage({int limit = 20, int offset = 0}) =>
+      (select(leafImages)
+            ..orderBy([(t) => OrderingTerm.desc(t.capturedAt)])
+            ..limit(limit, offset: offset))
+          .get();
+
   /// Cuenta el total de imágenes
   Future<int> countImages() async {
     final count = leafImages.id.count();

@@ -5,10 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
 import '../../config/routes.dart';
 import '../../config/constants.dart';
-import '../../core/services/image_validator.dart';
-import '../../core/services/storage_service.dart';
-import '../../app.dart';
-import '../../main.dart' show db;
+import '../../core/repositories/capture_repository.dart';
+import '../../core/di/service_locator.dart';
 import 'cubit/capture_cubit.dart';
 import 'cubit/capture_state.dart';
 
@@ -21,17 +19,9 @@ class PreviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final clf = ClassifierProvider.of(context);
+    final repo = sl<CaptureRepository>();
     return BlocProvider(
-      create: (_) => CaptureCubit(
-        validator: const ImageValidator(
-          blurThreshold: AppConstants.blurThreshold,
-          brightnessMin: AppConstants.brightnessMin,
-          brightnessMax: AppConstants.brightnessMax,
-        ),
-        storage: StorageService(db),
-        classifier: clf,
-      )..validateImage(imagePath),
+      create: (_) => CaptureCubit(repository: repo)..validateImage(imagePath),
       child: _PreviewView(imagePath: imagePath),
     );
   }

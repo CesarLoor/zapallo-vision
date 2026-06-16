@@ -1,4 +1,4 @@
-```
+# ── ZapalloVision ────────────────────────────────────────────
 # Dependencies
 .dart_tool/
 .build/
@@ -55,4 +55,14 @@ htmlcov/
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```
+
+# ML / data files
+*.npy
+*.npz
+
+# Drift generated code (regenerate with: dart run build_runner build)
+*.g.dart
+
+# Flutter auto-generated
+.flutter-plugins
+.flutter-plugins-dependencies

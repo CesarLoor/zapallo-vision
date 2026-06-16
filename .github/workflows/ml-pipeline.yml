@@ -1,0 +1,50 @@
+name: ML Pipeline CI
+
+on:
+  push:
+    paths:
+      - "model/**"
+      - ".github/workflows/ml-pipeline.yml"
+  pull_request:
+    paths:
+      - "model/**"
+
+jobs:
+  lint-and-check:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: model
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy
+          pip install -r requirements.txt --no-deps ultralytics opencv-python-headless pillow pyyaml
+
+      - name: Lint with ruff
+        run: ruff check scripts/ config.py
+
+      - name: Type check with mypy
+        run: mypy scripts/ config.py || true
+
+      - name: Validate YAML syntax
+        run: |
+          python -c "
+          import yaml
+          for f in ['data/dataset.yaml', 'data/dataset_final.yaml']:
+              with open(f) as fh:
+                  data = yaml.safe_load(fh)
+              assert data['nc'] == 5
+              assert len(data['names']) == 5
+              print(f'✓ {f}: {data[\"nc\"]} classes')
+          "

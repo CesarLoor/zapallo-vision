@@ -1,119 +1,124 @@
 """
-ZapalloAI — Pipeline de Preprocesamiento
-Ejecutar desde la raíz del proyecto:
-    python model/scripts/preprocess.py
+ZapalloAI — Pipeline de Preprocesamiento de Dataset.
 
-Estructura esperada:
-    model/data/raw/
-    ├── Cucurbit_leaf/
-    │   ├── Downy mildew/
-    │   ├── Healthy/
-    │   ├── Leaf curl disease/
-    │   └── Mosaic virus/
-    └── sweet_pumpkin/
-        └── Augmented Images/
-            ├── Augmented Sweet Pumpkin Downy Mildew Disease/
-            ├── Augmented Sweet Pumpkin Healthy Leaf/
-            ├── Augmented Sweet Pumpkin Leaf Curl Disease/
-            ├── Augmented Sweet Pumpkin Mosaic Disease/
-            └── Augmented Sweet Pumpkin Red Beetle/
+Unifica dos datasets raw (Cucurbit Leaf Disease + Sweet Pumpkin Disease),
+deduplica, divide estratificadamente (70/15/15), aumenta clases minoritarias
+y genera dataset_final.yaml.
 
-Salida:
-    model/data/processed/{train,val,test}/{clase}/
-    model/data/dataset_final.yaml
+Uso:
+    python model/scripts/preprocess.py [--no-aug] [--no-dedup]
 """
 
-import os, sys, shutil, random
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import random
+import shutil
+import sys
+from datetime import datetime
 from pathlib import Path
 
-# ─── Dependencias opcionales ──────────────────────────────────────
+import cv2
+import numpy as np
+
 try:
-    from PIL import Image
     import imagehash
-    DEDUP = True
+    from PIL import Image
+    HAS_DEDUP = True
 except ImportError:
-    DEDUP = False
-    print("[INFO] imagehash no instalado — se omite deduplicación")
+    HAS_DEDUP = False
 
 try:
-    import albumentations as A
-    import cv2
-    AUG = True
+    import albumentations as A  # noqa: N812
+    HAS_AUG = True
 except ImportError:
-    AUG = False
-    print("[INFO] albumentations/opencv no instalados — se omite augmentation")
+    HAS_AUG = False
 
-# ─── Rutas ────────────────────────────────────────────────────────
-ROOT = Path(__file__).resolve().parents[2]  # raíz del repo
-BASE_RAW    = ROOT / "model" / "data" / "raw"
-OUTPUT_DIR  = ROOT / "model" / "data" / "processed"
+try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None  # type: ignore[assignment]
 
-CUCURBIT_DIR  = BASE_RAW / "Cucurbit_leaf"
-SWEET_AUG_DIR = BASE_RAW / "sweet_pumpkin" / "Augmented Images"
-
-# ─── Clases y mapeos ──────────────────────────────────────────────
-CLASSES = ["healthy", "downy_mildew", "leaf_curl", "mosaic_virus", "red_beetle"]
-
-CUCURBIT_MAP = {
-    "Downy mildew":      "downy_mildew",
-    "Healthy":           "healthy",
-    "Leaf curl disease": "leaf_curl",
-    "Mosaic virus":      "mosaic_virus",
-}
-
-SWEET_MAP = {
-    "Augmented Sweet Pumpkin Downy Mildew Disease": "downy_mildew",
-    "Augmented Sweet Pumpkin Healthy Leaf":         "healthy",
-    "Augmented Sweet Pumpkin Leaf Curl Disease":    "leaf_curl",
-    "Augmented Sweet Pumpkin Mosaic Disease":       "mosaic_virus",
-    "Augmented Sweet Pumpkin Red Beetle":           "red_beetle",
-}
-
-TRAIN_RATIO = 0.70
-VAL_RATIO   = 0.15
-RANDOM_SEED = 42
-TARGET_PER_CLASS = None  # None = usar la clase más grande como objetivo
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from config import (
+    CLASSES,
+    CUCURBIT_DIR,
+    CUCURBIT_MAP,
+    IMAGE_EXTENSIONS,
+    PROCESSED_DIR,
+    RANDOM_SEED,
+    SWEET_AUG_DIR,
+    SWEET_MAP,
+    TARGET_PER_CLASS,
+    TRAIN_RATIO,
+    VAL_RATIO,
+)
 
 
-def get_images(folder: Path) -> list:
+def _tqdm(iterable, **kwargs):
+    return tqdm(iterable, **kwargs) if tqdm else iterable
+
+
+# ── Utilidades de archivos ──────────────────────────────────────────
+
+
+def get_images(folder: Path) -> list[Path]:
     if not folder.exists():
         return []
-    result = []
-    for ext in ["*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG"]:
+    result: list[Path] = []
+    for ext in IMAGE_EXTENSIONS:
         result.extend(folder.glob(ext))
     return result
 
 
-def collect_all() -> dict:
-    """Recopila imágenes de ambos datasets."""
-    by_cls = {c: [] for c in CLASSES}
+def _count_images(p: Path) -> int:
+    if not p.exists():
+        return 0
+    return sum(1 for _ in p.rglob("*.*") if _.suffix.lower() in
+               {".jpg", ".jpeg", ".png"})
 
+
+# ── Etapa 1: Recopilación ──────────────────────────────────────────
+
+
+def collect_all() -> dict[str, list[Path]]:
+    by_cls: dict[str, list[Path]] = {c: [] for c in CLASSES}
     print("\n[1/5] Recopilando imágenes...")
+
     for folder_name, cls_name in CUCURBIT_MAP.items():
         imgs = get_images(CUCURBIT_DIR / folder_name)
         by_cls[cls_name].extend(imgs)
-        print(f"  Cucurbit / {folder_name:<30}: {len(imgs):>5} imgs -> {cls_name}")
+        print(f"  Cucurbit / {folder_name:<30}: {len(imgs):>5} -> {cls_name}")
 
     for folder_name, cls_name in SWEET_MAP.items():
         imgs = get_images(SWEET_AUG_DIR / folder_name)
         by_cls[cls_name].extend(imgs)
-        print(f"  Sweet    / {folder_name[:30]:<30}: {len(imgs):>5} imgs -> {cls_name}")
+        print(f"  Sweet    / {folder_name[:30]:<30}: {len(imgs):>5} -> {cls_name}")
 
     return by_cls
 
 
-def deduplicate(by_cls: dict) -> dict:
-    """Elimina duplicados exactos con pHash."""
+# ── Etapa 2: Deduplicación ─────────────────────────────────────────
+
+
+def deduplicate(by_cls: dict[str, list[Path]],
+                no_dedup: bool = False) -> dict[str, list[Path]]:
     print("\n[2/5] Deduplicando...")
-    deduped = {}
+    deduped: dict[str, list[Path]] = {}
+
     for cls in CLASSES:
         imgs = by_cls[cls]
-        if not DEDUP:
+        if no_dedup or not HAS_DEDUP:
             deduped[cls] = imgs
-            print(f"  {cls:<20}: {len(imgs)} (sin dedup)")
+            status = "sin dedup" if no_dedup else "imagehash no disponible"
+            print(f"  {cls:<20}: {len(imgs):>5} ({status})")
             continue
-        seen, unique = {}, []
-        for p in imgs:
+
+        seen: dict[str, str] = {}
+        unique: list[Path] = []
+        for p in _tqdm(imgs, desc=f"  {cls:<20}", leave=False):
             try:
                 with Image.open(p) as img:
                     h = str(imagehash.phash(img))
@@ -122,146 +127,214 @@ def deduplicate(by_cls: dict) -> dict:
                     unique.append(p)
             except Exception:
                 pass
+
         removed = len(imgs) - len(unique)
         deduped[cls] = unique
-        print(f"  {cls:<20}: {len(imgs):>5} → {len(unique):>5} únicas (−{removed} dups)")
+        print(f"  {cls:<20}: {len(imgs):>5} → {len(unique):>5} (-{removed})")
+
     return deduped
 
 
-def split_and_copy(deduped: dict):
-    """Split estratificado y copia a processed/."""
+# ── Etapa 3: Split + copia ────────────────────────────────────────
+
+
+def split_and_copy(deduped: dict[str, list[Path]]) -> dict[str, dict[str, int]]:
     print("\n[3/5] Split y copia...")
     random.seed(RANDOM_SEED)
-    stats = {cls: {"train": 0, "val": 0, "test": 0} for cls in CLASSES}
 
-    for split in ["train", "val", "test"]:
+    for split in ("train", "val", "test"):
         for cls in CLASSES:
-            (OUTPUT_DIR / split / cls).mkdir(parents=True, exist_ok=True)
+            (PROCESSED_DIR / split / cls).mkdir(parents=True, exist_ok=True)
+
+    stats: dict[str, dict[str, int]] = {
+        cls: {"train": 0, "val": 0, "test": 0} for cls in CLASSES
+    }
 
     for cls in CLASSES:
         imgs = deduped[cls].copy()
         random.shuffle(imgs)
         n = len(imgs)
         n_train = int(n * TRAIN_RATIO)
-        n_val   = int(n * VAL_RATIO)
-        splits = {
+        n_val = int(n * VAL_RATIO)
+
+        splits: dict[str, list[Path]] = {
             "train": imgs[:n_train],
-            "val":   imgs[n_train:n_train + n_val],
-            "test":  imgs[n_train + n_val:],
+            "val": imgs[n_train:n_train + n_val],
+            "test": imgs[n_train + n_val:],
         }
+
         for split_name, split_imgs in splits.items():
+            dst_dir = PROCESSED_DIR / split_name / cls
             for img_path in split_imgs:
                 prefix = "swe" if "sweet_pumpkin" in str(img_path) else "cuc"
-                dst = OUTPUT_DIR / split_name / cls / f"{prefix}_{img_path.name}"
+                dst = dst_dir / f"{prefix}_{img_path.name}"
                 if not dst.exists():
                     shutil.copy2(img_path, dst)
                 stats[cls][split_name] += 1
 
         print(f"  {cls:<20}: train={stats[cls]['train']:>5}, "
               f"val={stats[cls]['val']:>4}, test={stats[cls]['test']:>4}")
+
     return stats
 
 
-def augment_minority(stats: dict):
-    """Aumenta clases minoritarias hasta igualar la más grande."""
-    if not AUG:
-        print("\n[4/5] Augmentation omitida (albumentations no instalado)")
-        return
+# ── Etapa 4: Augmentation ──────────────────────────────────────────
 
-    print("\n[4/5] Augmentation...")
-    pipeline = A.Compose([
+
+def _build_pipeline():
+    return A.Compose([
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.2),
         A.Rotate(limit=40, p=0.7),
-        A.RandomBrightnessContrast(0.3, 0.3, p=0.6),
-        A.HueSaturationValue(20, 40, 20, p=0.5),
+        A.RandomBrightnessContrast(brightness_limit=0.3,
+                                    contrast_limit=0.3, p=0.6),
+        A.HueSaturationValue(hue_shift_limit=20,
+                              sat_shift_limit=40,
+                              val_shift_limit=20, p=0.5),
         A.GaussianBlur(blur_limit=(3, 7), p=0.2),
         A.GaussNoise(var_limit=(10.0, 50.0), p=0.2),
-        A.CoarseDropout(num_holes_range=(1, 6),
-                        hole_height_range=(10, 30),
-                        hole_width_range=(10, 30), p=0.3),
+        A.CoarseDropout(max_holes=6, max_height=30, max_width=30, p=0.3),
     ])
 
+
+def augment_minority(stats: dict[str, dict[str, int]],
+                     no_aug: bool = False):
+    if no_aug or not HAS_AUG:
+        print("\n[4/5] Augmentation omitida")
+        return
+
+    print("\n[4/5] Aumentando clases minoritarias...")
+    pipeline = _build_pipeline()
     target = TARGET_PER_CLASS or max(stats[c]["train"] for c in CLASSES)
     aug_total = 0
 
     for cls in CLASSES:
-        train_dir = OUTPUT_DIR / "train" / cls
-        existing  = list(train_dir.glob("*.jpg")) + list(train_dir.glob("*.png"))
-        current   = len(existing)
-        needed    = max(0, target - current)
+        train_dir = PROCESSED_DIR / "train" / cls
+        existing = list(train_dir.glob("*.jpg")) + list(train_dir.glob("*.png"))
+        current = len(existing)
+        needed = max(0, target - current)
         if needed == 0:
-            print(f"  OK  {cls:<20}: {current} imgs")
+            print(f"  OK  {cls:<20}: {current}")
             continue
-        print(f"  AUG {cls:<20}: {current} → +{needed}...")
+
+        print(f"  AUG {cls:<20}: {current} → +{needed}...", end=" ")
         gen = 0
         while gen < needed:
             src = random.choice(existing)
             bgr = cv2.imread(str(src))
             if bgr is None:
                 continue
-            rgb     = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
             aug_rgb = pipeline(image=rgb)["image"]
             aug_bgr = cv2.cvtColor(aug_rgb, cv2.COLOR_RGB2BGR)
             out = train_dir / f"aug_{cls}_{gen:05d}.jpg"
             cv2.imwrite(str(out), aug_bgr, [cv2.IMWRITE_JPEG_QUALITY, 90])
             gen += 1
+
         aug_total += gen
+        print(f"listo ({gen})")
+
     print(f"  Total augmentadas: +{aug_total}")
 
 
+# ── Etapa 5: Exportar YAML ────────────────────────────────────────
+
+
 def save_yaml():
-    """Guarda dataset_final.yaml."""
-    yaml_path = OUTPUT_DIR.parent / "dataset_final.yaml"
+    path = PROCESSED_DIR.parent / "dataset_final.yaml"
     content = f"""# Dataset ZapalloAI — generado por preprocess.py
-path: {OUTPUT_DIR.resolve().as_posix()}
+# Clases en orden alfabético (coincide con YOLO)
+path: {PROCESSED_DIR.resolve().as_posix()}
 train: train
 val: val
 test: test
 
-nc: 5
+nc: {len(CLASSES)}
 names:
-  0: healthy
-  1: downy_mildew
-  2: leaf_curl
-  3: mosaic_virus
-  4: red_beetle
 """
-    with open(yaml_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    print(f"\n[5/5] dataset_final.yaml → {yaml_path}")
+    for i, cls in enumerate(CLASSES):
+        content += f"  {i}: {cls}\n"
+
+    path.write_text(content, encoding="utf-8")
+    print(f"\n[5/5] dataset_final.yaml → {path}")
+
+
+def save_json_summary(stats: dict[str, dict[str, int]]):
+    summary: dict = {
+        "timestamp": datetime.now().isoformat(),
+        "num_classes": len(CLASSES),
+        "classes": CLASSES,
+        "per_class": {},
+        "total": {"train": 0, "val": 0, "test": 0},
+    }
+
+    for cls in CLASSES:
+        t, v, ts = stats[cls]["train"], stats[cls]["val"], stats[cls]["test"]
+        summary["per_class"][cls] = {"train": t, "val": v, "test": ts, "total": t + v + ts}
+        summary["total"]["train"] += t
+        summary["total"]["val"] += v
+        summary["total"]["test"] += ts
+
+    train_counts = [stats[c]["train"] for c in CLASSES if stats[c]["train"] > 0]
+    summary["balance_ratio"] = (
+        round(max(train_counts) / min(train_counts), 2) if train_counts else 0
+    )
+    summary["total_images"] = (
+        summary["total"]["train"] + summary["total"]["val"] + summary["total"]["test"]
+    )
+
+    path = PROCESSED_DIR.parent / "dataset_summary.json"
+    path.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"\n  dataset_summary.json → {path}")
 
 
 def print_summary():
-    total = sum(
-        sum(1 for _ in (OUTPUT_DIR / split / cls).glob("*.*"))
-        for split in ["train", "val", "test"]
-        for cls in CLASSES
-        if (OUTPUT_DIR / split / cls).exists()
-    )
+    total = sum(_count_images(PROCESSED_DIR / split / cls)
+                for split in ("train", "val", "test")
+                for cls in CLASSES)
     print(f"\n{'─'*50}")
-    print(f"  Total imágenes procesadas : {total:,}")
-    print(f"  Dataset listo en          : {OUTPUT_DIR}")
+    print(f"  Total imágenes procesadas: {total:,}")
+    print(f"  Dataset listo en          : {PROCESSED_DIR}")
     print(f"{'─'*50}")
-    print("\n  Siguiente paso: python model/scripts/train.py")
-    print("  O ejecutar el Notebook 03 con COLAB_MODE = False\n")
+    print("\n  Siguiente paso: python model/scripts/train.py\n")
 
 
-if __name__ == "__main__":
+def _parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="ZapalloAI — Preprocesamiento de Dataset")
+    parser.add_argument("--no-aug", action="store_true",
+                        help="Omitir augmentation de datos")
+    parser.add_argument("--no-dedup", action="store_true",
+                        help="Omitir deduplicación por pHash")
+    return parser.parse_args()
+
+
+def main():
+    args = _parse_args()
+
+    os.environ["PYTHONHASHSEED"] = str(RANDOM_SEED)
+    random.seed(RANDOM_SEED)
+    np.random.seed(RANDOM_SEED)
+
     print("=" * 50)
     print("  ZapalloAI — Preprocesamiento de Dataset")
     print("=" * 50)
 
-    # Verificar que existen los datasets
     if not CUCURBIT_DIR.exists() and not SWEET_AUG_DIR.exists():
-        print("\n⛔ ERROR: No se encontraron los datasets en:")
-        print(f"   {CUCURBIT_DIR}")
-        print(f"   {SWEET_AUG_DIR}")
+        print("\nERROR: No se encontraron los datasets raw en:")
+        print(f"  {CUCURBIT_DIR}")
+        print(f"  {SWEET_AUG_DIR}")
+        print("Descarga los datasets de Mendeley Data (ver model/README.md)")
         sys.exit(1)
 
-    by_cls  = collect_all()
-    deduped = deduplicate(by_cls)
-    stats   = split_and_copy(deduped)
-    augment_minority(stats)
+    by_cls = collect_all()
+    deduped = deduplicate(by_cls, no_dedup=args.no_dedup)
+    stats = split_and_copy(deduped)
+    augment_minority(stats, no_aug=args.no_aug)
     save_yaml()
+    save_json_summary(stats)
     print_summary()
+
+
+if __name__ == "__main__":
+    main()

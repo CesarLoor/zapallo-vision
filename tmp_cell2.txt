@@ -1,0 +1,15 @@
+# ── 1. Importar config y cargar TFLite ──────────────────────
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path.cwd() / 'model'))
+from config import CLASSES, EXPORT_DIR, PROCESSED_DIR, FLUTTER_TFLITE, FLUTTER_LABELS
+
+# Cargar labels
+labels_path = EXPORT_DIR / 'labels.txt'
+if labels_path.exists():
+    labels = labels_path.read_text().strip().splitlines()
+    print(f'Labels ({len(labels)}): {labels}')
+else:
+    labels = CLASSES
+    print(f'Usando CLASSES de config: {labels}'))

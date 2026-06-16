@@ -1,42 +1,29 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/repositories/capture_repository.dart';
 import '../../../core/services/image_validator.dart';
-import '../../../core/services/storage_service.dart';
-import '../../../core/services/classifier_service.dart';
 import 'capture_state.dart';
 
 class CaptureCubit extends Cubit<CaptureState> {
-  final ImageValidator _validator;
-  final StorageService _storage;
-  final ClassifierService _classifier;
+  final CaptureRepository _repository;
 
-  CaptureCubit({
-    required ImageValidator validator,
-    required StorageService storage,
-    required ClassifierService classifier,
-  })  : _validator = validator,
-        _storage = storage,
-        _classifier = classifier,
+  CaptureCubit({required CaptureRepository repository})
+      : _repository = repository,
         super(const CaptureInitial());
 
-  /// Valida la imagen recién capturada — FUN-004
   Future<void> validateImage(String imagePath) async {
     emit(const CaptureValidating());
     try {
-      final report = await _validator.validate(imagePath);
+      final report = await _repository.validateImage(imagePath);
       emit(CaptureValidated(imagePath: imagePath, report: report));
     } catch (e) {
       emit(const CaptureError('Error al analizar la imagen.'));
     }
   }
 
-  /// Clasifica la imagen con el modelo TFLite
   Future<void> classifyImage(String imagePath, ImageValidationReport report) async {
     emit(const CaptureClassifying());
     try {
-      if (!_classifier.isReady) {
-        await _classifier.initialize();
-      }
-      final result = await _classifier.classify(imagePath);
+      final result = await _repository.classifyImage(imagePath);
       emit(CaptureClassified(
         imagePath: imagePath,
         result: result,
@@ -47,10 +34,9 @@ class CaptureCubit extends Cubit<CaptureState> {
     }
   }
 
-  /// Guarda la imagen en almacenamiento local — FUN-006
   Future<void> saveImage(String imagePath, ImageValidationReport report) async {
     emit(const CaptureSaving());
-    final result = await _storage.saveImage(
+    final result = await _repository.saveImage(
       sourcePath: imagePath,
       validationReport: report,
     );
@@ -61,6 +47,5 @@ class CaptureCubit extends Cubit<CaptureState> {
     }
   }
 
-  /// Reinicia el estado para nueva captura — FUN-003
   void reset() => emit(const CaptureInitial());
 }

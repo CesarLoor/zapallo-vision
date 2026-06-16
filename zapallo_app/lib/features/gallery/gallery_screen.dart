@@ -7,8 +7,8 @@ import '../../config/theme.dart';
 import '../../config/constants.dart';
 import '../../config/routes.dart';
 import '../../core/database/app_database.dart';
-import '../../core/services/storage_service.dart';
-import '../../main.dart';
+import '../../core/repositories/gallery_repository.dart';
+import '../../core/di/service_locator.dart';
 import 'cubit/gallery_cubit.dart';
 import 'cubit/gallery_state.dart';
 
@@ -18,11 +18,9 @@ class GalleryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final repo = sl<GalleryRepository>();
     return BlocProvider(
-      create: (_) => GalleryCubit(
-        db: db,
-        storage: StorageService(db),
-      )..loadImages()..watchImages(),
+      create: (_) => GalleryCubit(repository: repo)..loadImages()..watchImages(),
       child: const _GalleryView(),
     );
   }
@@ -136,25 +134,55 @@ class _ImageGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.82,
+    final cubit = context.read<GalleryCubit>();
+    final state = context.watch<GalleryCubit>().state;
+    final hasMore = state is GalleryLoaded && state.hasMore;
+
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        if (notification is ScrollEndNotification &&
+            notification.metrics.pixels >=
+                notification.metrics.maxScrollExtent - 300 &&
+            hasMore) {
+          cubit.loadMore();
+        }
+        return false;
+      },
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 0.82,
+        ),
+        itemCount: images.length + (hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index >= images.length) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          }
+          return _ImageCard(image: images[index], cubit: cubit);
+        },
       ),
-      itemCount: images.length,
-      itemBuilder: (context, index) => _ImageCard(image: images[index]),
     );
   }
 }
 
 class _ImageCard extends StatelessWidget {
   final LeafImage image;
+  final GalleryCubit cubit;
   final _dateFormat = DateFormat('dd/MM/yyyy\nHH:mm');
 
-  _ImageCard({required this.image});
+  _ImageCard({required this.image, required this.cubit});
 
   @override
   Widget build(BuildContext context) {
@@ -164,6 +192,7 @@ class _ImageCard extends StatelessWidget {
       key: Key('img_card_${image.id}'),
       onTap: () => context.push(
         AppRouter.imageDetail.replaceFirst(':id', image.id),
+        extra: cubit,
       ),
       child: Container(
         decoration: BoxDecoration(
@@ -186,20 +215,19 @@ class _ImageCard extends StatelessWidget {
                 borderRadius: const BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
-                child: file.existsSync()
-                    ? Image.file(
-                        file,
-                        fit: BoxFit.cover,
-                        width: double.infinity,
-                      )
-                    : Container(
-                        color: ZapalloTheme.background,
-                        child: const Icon(
-                          Icons.broken_image_outlined,
-                          color: ZapalloTheme.textHint,
-                          size: 40,
-                        ),
-                      ),
+                child: Image.file(
+                  file,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: ZapalloTheme.background,
+                    child: const Icon(
+                      Icons.broken_image_outlined,
+                      color: ZapalloTheme.textHint,
+                      size: 40,
+                    ),
+                  ),
+                ),
               ),
             ),
             // Fecha y hora

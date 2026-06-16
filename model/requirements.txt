@@ -1,44 +1,33 @@
-# ============================================================
-# ZapalloAI — Dependencias del proyecto
-# ============================================================
-# NOTA: torch/torchvision/torchaudio se instalan APARTE con:
-#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-# Esto es necesario en Windows para obtener la versión con CUDA.
-# ============================================================
-
-# Core ML
+# ── Core ML ─────────────────────────────────────────────────────────
 ultralytics>=8.3.0,<9.0.0
+torch>=2.5.0,<3.0.0
+torchvision>=0.20.0
 
-# Procesamiento de imágenes
-opencv-python-headless>=4.9.0
+# ── Procesamiento de imágenes ──────────────────────────────────────
+opencv-python-headless>=4.10.0
 Pillow>=10.0.0
 imagehash>=4.3.0
 albumentations>=1.4.0
 
-# Data science
-scikit-learn>=1.4.0
+# ── Análisis y visualización ──────────────────────────────────────
+scikit-learn>=1.5.0
 pandas>=2.2.0
-numpy>=1.26.0,<2.0.0     # CRITICO: onnx2tf requiere numpy<2.0
-
-# Visualización
 matplotlib>=3.8.0
 seaborn>=0.13.0
 
-# Utilidades
+# ── Utilidades ─────────────────────────────────────────────────────
+numpy<2.0.0  # CRITICO: onnx2tf requiere numpy<2.0
 tqdm>=4.66.0
-PyYAML>=6.0
-
-# Jupyter
+PyYAML>=6.0.0
 jupyter>=1.0.0
-ipywidgets>=8.0.0
-ipykernel>=6.0.0
 
-# Exportación ONNX → TFLite
-onnx>=1.15.0,<2.0.0
-onnxruntime-gpu>=1.17.0
-tensorflow>=2.17.0,<2.20.0
-tf-keras<=2.19.0
-onnx2tf>=1.26.3,<1.29.0
-sng4onnx>=1.0.1
-onnx-graphsurgeon>=0.3.26
-ai-edge-litert>=1.2.0
+# ── Exportación TFLite ────────────────────────────────────────────
+# Instalar en orden:
+#   1. onnx>=1.16.0
+#   2. onnxruntime-gpu>=1.18.0
+#   3. tensorflow<2.20.0
+#   4. onnx2tf<1.29.0
+#   5. ai-edge-litert>=1.0.0
+#
+# Torch instalar por separado con CUDA:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121

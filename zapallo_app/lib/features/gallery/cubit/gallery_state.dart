@@ -13,10 +13,12 @@ class GalleryLoading extends GalleryState {
 
 class GalleryLoaded extends GalleryState {
   final List<LeafImage> images;
-  const GalleryLoaded(this.images);
+  final int totalCount;
+  const GalleryLoaded(this.images, {this.totalCount = 0});
   @override
-  List<Object?> get props => [images];
+  List<Object?> get props => [images, totalCount];
   bool get isEmpty => images.isEmpty;
+  bool get hasMore => images.length < totalCount;
 }
 
 class GalleryError extends GalleryState {

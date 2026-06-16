@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'config/routes.dart';
 import 'config/theme.dart';
 import 'core/services/classifier_service.dart';
+import 'core/di/service_locator.dart';
 
-/// ClassifierProvider: acceso global al clasificador sin globals en main.dart.
+/// ClassifierProvider: acceso global al clasificador sin service locator directo en widgets.
 /// Se inicializa una sola vez y se pasa por herencia al árbol de widgets.
 class ClassifierProvider extends InheritedWidget {
   final ClassifierService classifier;
@@ -37,16 +38,12 @@ class ZapalloApp extends StatelessWidget {
       theme: ZapalloTheme.lightTheme,
       routerConfig: AppRouter.router,
       builder: (context, child) {
-        // Envolver toda la app en el FutureBuilder de carga del modelo
         return _ModelLoader(child: child ?? const SizedBox.shrink());
       },
     );
   }
 }
 
-/// Carga el modelo TFLite de forma asíncrona mostrando un splash screen
-/// profesional mientras se inicializa. Tras la carga, expone el
-/// ClassifierService a toda la app via ClassifierProvider.
 class _ModelLoader extends StatefulWidget {
   final Widget child;
   const _ModelLoader({required this.child});
@@ -87,11 +84,9 @@ class _ModelLoaderState extends State<_ModelLoader>
     try {
       await svc.initialize();
     } catch (e) {
-      // Si falla, se crea el servicio sin modelo. La app puede funcionar
-      // parcialmente (galería, historial). Al intentar clasificar,
-      // CaptureCubit emitirá CaptureError con mensaje descriptivo.
       debugPrint('[ZapalloAI] Modelo no cargado: $e');
     }
+    registerClassifier(svc);
     return svc;
   }
 
@@ -101,11 +96,8 @@ class _ModelLoaderState extends State<_ModelLoader>
       future: _initFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          // ── Splash / loading screen ──────────────────────────────
           return _SplashScreen(pulseAnim: _pulseAnim);
         }
-
-        // ── App lista: envolver con ClassifierProvider ────────────
         return ClassifierProvider(
           classifier: snapshot.data!,
           child: widget.child,

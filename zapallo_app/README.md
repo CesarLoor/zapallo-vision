@@ -1,17 +1,57 @@
-# zapallo_app
+# ZapalloAI — App Móvil
 
-Detector movil de enfermedades foliares en zapallo
+Detector offline de enfermedades foliares en zapallo (Cucurbita moschata) usando YOLOv11n-cls + TensorFlow Lite.
 
-## Getting Started
+## Stack
 
-This project is a starting point for a Flutter application.
+- **Flutter 3.44** / Dart 3.12+
+- **flutter_bloc** (Cubit) + Equatable
+- **GoRouter** 14.x
+- **Drift** (SQLite ORM) 2.22
+- **tflite_flutter** 0.12
+- **Target:** Android 16 (API 36) — Samsung Galaxy S25+
 
-A few resources to get you started if this is your first Flutter project:
+## Clases de diagnóstico
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+| Clase | Enfermedad |
+|-------|-----------|
+| `healthy` | Hoja sana |
+| `downy_mildew` | Mildiú velloso |
+| `leaf_curl` | Virus de la hoja rizada |
+| `mosaic_virus` | Virus del mosaico |
+| `red_beetle` | Daño por escarabajo rojo |
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Desarrollo
+
+```sh
+flutter pub get
+dart run build_runner build --delete-conflicting-outputs
+flutter run
+```
+
+## Tests
+
+```sh
+flutter test
+```
+
+## Arquitectura
+
+```
+lib/
+├── config/        # Constantes, tema, rutas, base de conocimiento
+├── core/
+│   ├── database/  # Drift ORM (SQLite)
+│   ├── services/  # ClassifierService, ImageValidator, StorageService
+│   └── repositories/  # Capa de abstracción DB → Cubits
+└── features/
+    ├── home/       # Pantalla principal
+    ├── capture/    # Captura + preview + cubit
+    ├── diagnosis/  # Resultados y recomendaciones
+    └── gallery/    # Galería + detalle + cubit
+```
+
+## Thesis
+
+Proyecto de titulación — Universidad de las Fuerzas Armadas ESPE, 2026.
+Autores: César Loor, Camilo Orrico.

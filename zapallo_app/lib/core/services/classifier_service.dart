@@ -202,7 +202,7 @@ class ClassifierService {
         final pixel = image.getPixel(x, y);
         buffer[idx++] = pixel.r / 255.0;
         buffer[idx++] = pixel.g / 255.0;
-        buffer[idx++] = pixel.b.toDouble() / 255.0;
+        buffer[idx++] = pixel.b / 255.0;
       }
     }
     return buffer.buffer.asUint8List();

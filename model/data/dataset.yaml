@@ -1,39 +1,27 @@
-# Dataset YAML para YOLOv11n-cls
-# Este archivo se usa si se necesita configuración explícita.
-# Para clasificación, YOLO solo necesita la estructura de carpetas:
-#   data/processed/
+# Dataset YAML para ZapalloAI — YOLOv11n-cls
+# Las clases están en orden alfabético porque YOLO asigna índices
+# según el orden alfabético de las carpetas en train/.
+#
+# Estructura esperada:
+#   model/data/processed/
 #     ├── train/
-#     │   ├── healthy/
 #     │   ├── downy_mildew/
+#     │   ├── healthy/
 #     │   ├── leaf_curl/
 #     │   ├── mosaic_virus/
 #     │   └── red_beetle/
-#     ├── val/
-#     │   └── (mismas subcarpetas)
-#     └── test/
-#         └── (mismas subcarpetas)
+#     ├── val/   (mismas subcarpetas)
+#     └── test/  (mismas subcarpetas)
 
-# Ruta base (ajustar según entorno Colab/local)
-path: ./data/processed
-
+path: ./processed
 train: train
 val: val
 test: test
 
-# Clases
+nc: 5
 names:
-  0: healthy
-  1: downy_mildew
+  0: downy_mildew
+  1: healthy
   2: leaf_curl
   3: mosaic_virus
   4: red_beetle
-
-# Número de clases
-nc: 5
-
-# Descripción
-description: >
-  Dataset unificado para detección de enfermedades foliares en zapallo
-  (Cucurbita moschata / pepo). Combina Sweet Pumpkin Disease Recognition
-  (7,000 imgs) y Cucurbit Leaf Disease Dataset (4,121 imgs).
-  Total: ~11,000 imágenes antes de augmentations adicionales.

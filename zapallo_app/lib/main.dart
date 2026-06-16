@@ -1,20 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app.dart';
-import 'core/database/app_database.dart';
-
-late AppDatabase db;
+import 'core/di/service_locator.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Orientación solo portrait
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Estilo de la barra de estado
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -22,9 +18,7 @@ Future<void> main() async {
     ),
   );
 
-  // Inicializar base de datos (rápido, siempre necesario)
-  db = AppDatabase();
+  await initCoreServices();
 
-  // El modelo se inicializa en app.dart con FutureBuilder para no bloquear
   runApp(const ZapalloApp());
 }

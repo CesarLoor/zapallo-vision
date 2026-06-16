@@ -1,0 +1,24 @@
+# Datos
+data/raw/
+data/processed/
+
+# Outputs
+runs/
+exports/*.pt
+
+# Notebook outputs (keep code, strip outputs)
+.ipynb_checkpoints/
+
+# Cache
+__pycache__/
+*.pyc
+*.cache
+.cache
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

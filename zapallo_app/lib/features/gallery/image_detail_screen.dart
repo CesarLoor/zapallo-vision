@@ -8,23 +8,28 @@ import '../../config/theme.dart';
 import '../../config/constants.dart';
 import '../../config/disease_info.dart';
 import '../../core/database/app_database.dart';
-import '../../core/services/storage_service.dart';
-import '../../main.dart';
+import '../../core/repositories/gallery_repository.dart';
+import '../../core/di/service_locator.dart';
 import 'cubit/gallery_cubit.dart';
 
 /// Pantalla de detalle de imagen guardada — HU-009, HU-010
 class ImageDetailScreen extends StatelessWidget {
   final String imageId;
+  final GalleryCubit? cubit;
 
-  const ImageDetailScreen({super.key, required this.imageId});
+  const ImageDetailScreen({super.key, required this.imageId, this.cubit});
 
   @override
   Widget build(BuildContext context) {
+    if (cubit != null) {
+      return BlocProvider.value(
+        value: cubit!,
+        child: _ImageDetailView(imageId: imageId),
+      );
+    }
+    final repo = sl<GalleryRepository>();
     return BlocProvider(
-      create: (_) => GalleryCubit(
-        db: db,
-        storage: StorageService(db),
-      )..loadImages()..watchImages(),
+      create: (_) => GalleryCubit(repository: repo)..loadImages()..watchImages(),
       child: _ImageDetailView(imageId: imageId),
     );
   }
@@ -50,7 +55,8 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
   }
 
   Future<void> _loadImage() async {
-    final image = await db.getImageById(widget.imageId);
+    final repo = sl<GalleryRepository>();
+    final image = await repo.getImageById(widget.imageId);
     if (mounted) {
       setState(() {
         _image = image;
@@ -60,6 +66,10 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
   }
 
   Future<void> _confirmDelete(BuildContext context) async {
+    final cubit = context.read<GalleryCubit>();
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -94,14 +104,6 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
     );
 
     if (confirmed == true && _image != null && mounted) {
-      // Capturar refs ANTES del gap async — safe: verificamos mounted justo arriba
-      // ignore: use_build_context_synchronously
-      final cubit = context.read<GalleryCubit>();
-      // ignore: use_build_context_synchronously
-      final messenger = ScaffoldMessenger.of(context);
-      // ignore: use_build_context_synchronously
-      final router = GoRouter.of(context);
-
       HapticFeedback.mediumImpact();
       final success = await cubit.deleteImage(_image!);
       if (mounted) {
@@ -222,14 +224,16 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
               ),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              background: file.existsSync()
-                  ? InteractiveViewer(
-                      child: Image.file(file, fit: BoxFit.contain),
-                    )
-                  : const Center(
-                      child: Icon(Icons.broken_image_outlined,
-                          color: Colors.white54, size: 80),
-                    ),
+              background: InteractiveViewer(
+                child: Image.file(
+                  file,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => const Center(
+                    child: Icon(Icons.broken_image_outlined,
+                        color: Colors.white54, size: 80),
+                  ),
+                ),
+              ),
             ),
           ),
 
