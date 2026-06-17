@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../config/theme.dart';
 import '../../config/constants.dart';
+import '../../config/disease_info.dart';
 import '../../config/routes.dart';
 import '../../core/database/app_database.dart';
 import '../../core/repositories/gallery_repository.dart';
@@ -13,6 +14,7 @@ import 'cubit/gallery_cubit.dart';
 import 'cubit/gallery_state.dart';
 
 /// Galería de imágenes guardadas — FUN-009
+/// v1.5: Badges de diagnóstico en tarjetas + animaciones staggered
 class GalleryScreen extends StatelessWidget {
   const GalleryScreen({super.key});
 
@@ -154,7 +156,7 @@ class _ImageGrid extends StatelessWidget {
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 0.82,
+          childAspectRatio: 0.72,
         ),
         itemCount: images.length + (hasMore ? 1 : 0),
         itemBuilder: (context, index) {
@@ -170,8 +172,72 @@ class _ImageGrid extends StatelessWidget {
               ),
             );
           }
-          return _ImageCard(image: images[index], cubit: cubit);
+          return _AnimatedImageCard(
+            image: images[index],
+            cubit: cubit,
+            index: index,
+          );
         },
+      ),
+    );
+  }
+}
+
+/// Tarjeta de imagen con animación staggered de entrada
+class _AnimatedImageCard extends StatefulWidget {
+  final LeafImage image;
+  final GalleryCubit cubit;
+  final int index;
+
+  const _AnimatedImageCard({
+    required this.image,
+    required this.cubit,
+    required this.index,
+  });
+
+  @override
+  State<_AnimatedImageCard> createState() => _AnimatedImageCardState();
+}
+
+class _AnimatedImageCardState extends State<_AnimatedImageCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fadeAnim;
+  late final Animation<Offset> _slideAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _fadeAnim = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _slideAnim = Tween<Offset>(
+      begin: const Offset(0, 0.15),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
+    // Staggered delay based on index (cap at 8 to avoid long waits)
+    final delay = Duration(milliseconds: (widget.index % 8) * 60);
+    Future.delayed(delay, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnim,
+      child: SlideTransition(
+        position: _slideAnim,
+        child: _ImageCard(image: widget.image, cubit: widget.cubit),
       ),
     );
   }
@@ -180,13 +246,17 @@ class _ImageGrid extends StatelessWidget {
 class _ImageCard extends StatelessWidget {
   final LeafImage image;
   final GalleryCubit cubit;
-  final _dateFormat = DateFormat('dd/MM/yyyy\nHH:mm');
+  final _dateFormat = DateFormat('dd/MM/yyyy');
 
   _ImageCard({required this.image, required this.cubit});
 
   @override
   Widget build(BuildContext context) {
     final file = File(image.filePath);
+    final hasDiagnosis = image.diagnosisClass != null;
+    final disease = hasDiagnosis
+        ? DiseaseDatabase.getOrDefault(image.diagnosisClass!)
+        : null;
 
     return GestureDetector(
       key: Key('img_card_${image.id}'),
@@ -209,44 +279,187 @@ class _ImageCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Miniatura
+            // Miniatura con badge overlay
             Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
-                child: Image.file(
-                  file,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    color: ZapalloTheme.background,
-                    child: const Icon(
-                      Icons.broken_image_outlined,
-                      color: ZapalloTheme.textHint,
-                      size: 40,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
+                    child: Image.file(
+                      file,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: ZapalloTheme.background,
+                        child: const Icon(
+                          Icons.broken_image_outlined,
+                          color: ZapalloTheme.textHint,
+                          size: 40,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  // Badge de diagnóstico en esquina superior derecha
+                  if (hasDiagnosis && disease != null)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: disease.color.withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: disease.color.withValues(alpha: 0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              disease.isHealthy
+                                  ? Icons.check_circle_rounded
+                                  : disease.icon,
+                              color: Colors.white,
+                              size: 12,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                disease.isHealthy ? 'Sana' : _shortLabel(disease.labelEs),
+                                style: const TextStyle(
+                                  fontFamily: 'Outfit',
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  // Indicador de severidad en esquina inferior izquierda
+                  if (hasDiagnosis && disease != null && !disease.isHealthy)
+                    Positioned(
+                      bottom: 8,
+                      left: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: DiseaseInfo.severityColor(
+                                    disease.severity),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              disease.severityLabel,
+                              style: const TextStyle(
+                                fontFamily: 'Outfit',
+                                fontSize: 9,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-            // Fecha y hora
+            // Fecha, hora y confianza
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Text(
-                _dateFormat.format(image.capturedAt),
-                style: const TextStyle(
-                  fontFamily: 'Outfit',
-                  fontSize: 11,
-                  color: ZapalloTheme.textSecondary,
-                  height: 1.4,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _dateFormat.format(image.capturedAt),
+                    style: const TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 11,
+                      color: ZapalloTheme.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (hasDiagnosis) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            disease!.labelEs,
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: disease.color,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '${((image.diagnosisConfidence ?? 0) * 100).toStringAsFixed(0)}%',
+                          style: TextStyle(
+                            fontFamily: 'Outfit',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: disease.color.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    // Mini confidence bar
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: image.diagnosisConfidence ?? 0,
+                        minHeight: 3,
+                        backgroundColor:
+                            disease.color.withValues(alpha: 0.12),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(disease.color),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Acorta etiquetas largas para el badge
+  String _shortLabel(String label) {
+    if (label.length <= 12) return label;
+    return '${label.substring(0, 10)}…';
   }
 }
 

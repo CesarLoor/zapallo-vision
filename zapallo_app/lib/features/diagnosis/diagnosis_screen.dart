@@ -10,9 +10,11 @@ import '../../core/services/classifier_service.dart';
 import '../../core/services/image_validator.dart';
 import '../../core/repositories/capture_repository.dart';
 import '../../core/di/service_locator.dart';
+import '../../core/widgets/shared_diagnosis_widgets.dart';
 
 /// Pantalla de resultados del diagnóstico — HU-006, HU-007
 /// Muestra la enfermedad detectada, confianza, síntomas y recomendaciones.
+/// v1.5: Refactorizado para usar widgets compartidos de shared_diagnosis_widgets.dart
 class DiagnosisScreen extends StatefulWidget {
   final String imagePath;
   final ClassificationResult result;
@@ -121,9 +123,6 @@ class _DiagnosisScreenState extends State<DiagnosisScreen>
 
   @override
   Widget build(BuildContext context) {
-    final confidence = widget.result.confidence;
-    final pct = (confidence * 100).toStringAsFixed(1);
-
     return Scaffold(
       backgroundColor: ZapalloTheme.background,
       body: CustomScrollView(
@@ -194,7 +193,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen>
                                   ),
                                 ),
                                 Text(
-                                  '$pct% de confianza',
+                                  '${(widget.result.confidence * 100).toStringAsFixed(1)}% de confianza',
                                   style: TextStyle(
                                     fontFamily: 'Outfit',
                                     fontSize: 14,
@@ -226,142 +225,17 @@ class _DiagnosisScreenState extends State<DiagnosisScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ── Banner de baja confianza ────────────────
-                    if (_isLowConfidence) ...[
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: ZapalloTheme.warning.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: ZapalloTheme.warning.withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline_rounded,
-                              color: ZapalloTheme.warning,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                AppConstants.msgLowConfidence,
-                                style: const TextStyle(
-                                  fontFamily: 'Outfit',
-                                  fontSize: 12,
-                                  color: ZapalloTheme.textPrimary,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // ── Barra de confianza ─────────────────────────
-                    _ConfidenceBar(
-                      confidence: confidence,
-                      color: _disease.color,
-                    ),
-                    const SizedBox(height: 20),
-
-                    // ── Badge de severidad ──────────────────────────
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: DiseaseInfo.severityColor(_disease.severity)
-                            .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: DiseaseInfo.severityColor(_disease.severity)
-                              .withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: DiseaseInfo.severityColor(
-                                  _disease.severity),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _disease.severityLabel,
-                            style: TextStyle(
-                              fontFamily: 'Outfit',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: DiseaseInfo.severityColor(
-                                  _disease.severity),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // ── Descripción ────────────────────────────────
-                    _SectionCard(
-                      title: 'Descripción',
-                      icon: Icons.info_outline_rounded,
-                      child: Text(
-                        _disease.description,
-                        style: const TextStyle(
-                          fontFamily: 'Outfit',
-                          fontSize: 14,
-                          color: ZapalloTheme.textSecondary,
-                          height: 1.6,
-                        ),
-                      ),
+                    // ── Reporte de diagnóstico compartido ─────────
+                    DiagnosisReportSection(
+                      disease: _disease,
+                      confidence: widget.result.confidence,
+                      isLowConfidence: _isLowConfidence,
+                      animate: true,
                     ),
                     const SizedBox(height: 12),
 
-                    // ── Síntomas ───────────────────────────────────
-                    if (_disease.symptoms.isNotEmpty)
-                      _SectionCard(
-                        title: _disease.isHealthy
-                            ? 'Características'
-                            : 'Síntomas',
-                        icon: _disease.isHealthy
-                            ? Icons.check_circle_outline_rounded
-                            : Icons.local_hospital_rounded,
-                        child: Column(
-                          children: _disease.symptoms
-                              .map((s) => _BulletItem(text: s))
-                              .toList(),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-
-                    // ── Recomendaciones ────────────────────────────
-                    if (_disease.recommendations.isNotEmpty)
-                      _SectionCard(
-                        title: 'Recomendaciones',
-                        icon: Icons.lightbulb_outline_rounded,
-                        iconColor: ZapalloTheme.secondary,
-                        child: Column(
-                          children: _disease.recommendations
-                              .asMap()
-                              .entries
-                              .map((e) => _NumberedItem(
-                                  number: e.key + 1, text: e.value))
-                              .toList(),
-                        ),
-                      ),
-                    const SizedBox(height: 12),
-
-                    // ── Todas las clases (scores) ──────────────────
-                    _SectionCard(
+                    // ── Todas las clases (scores) ── (único de esta pantalla)
+                    SectionCard(
                       title: 'Detalle de clasificación',
                       icon: Icons.bar_chart_rounded,
                       child: Column(
@@ -434,211 +308,7 @@ class _DiagnosisScreenState extends State<DiagnosisScreen>
   }
 }
 
-// ── Widgets auxiliares ─────────────────────────────────────────────
-
-class _ConfidenceBar extends StatelessWidget {
-  final double confidence;
-  final Color color;
-  const _ConfidenceBar({required this.confidence, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Nivel de confianza',
-                style: TextStyle(
-                  fontFamily: 'Outfit',
-                  fontSize: 13,
-                  color: ZapalloTheme.textSecondary,
-                ),
-              ),
-              Text(
-                '${(confidence * 100).toStringAsFixed(1)}%',
-                style: TextStyle(
-                  fontFamily: 'Outfit',
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: LinearProgressIndicator(
-              value: confidence,
-              minHeight: 10,
-              backgroundColor: color.withValues(alpha: 0.12),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color? iconColor;
-  final Widget child;
-
-  const _SectionCard({
-    required this.title,
-    required this.icon,
-    this.iconColor,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon,
-                  size: 20, color: iconColor ?? ZapalloTheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontFamily: 'Outfit',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: ZapalloTheme.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _BulletItem extends StatelessWidget {
-  final String text;
-  const _BulletItem({required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 7),
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: ZapalloTheme.primaryLight,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontFamily: 'Outfit',
-                fontSize: 13,
-                color: ZapalloTheme.textSecondary,
-                height: 1.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NumberedItem extends StatelessWidget {
-  final int number;
-  final String text;
-  const _NumberedItem({required this.number, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: ZapalloTheme.primarySurface,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Center(
-              child: Text(
-                '$number',
-                style: const TextStyle(
-                  fontFamily: 'Outfit',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: ZapalloTheme.primary,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontFamily: 'Outfit',
-                fontSize: 13,
-                color: ZapalloTheme.textSecondary,
-                height: 1.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+// ── Widget _ScoreRow (sigue siendo privado, solo se usa aquí) ─────
 
 class _ScoreRow extends StatelessWidget {
   final String label;

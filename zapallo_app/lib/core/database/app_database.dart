@@ -55,6 +55,35 @@ class AppDatabase extends _$AppDatabase {
     final row = await query.getSingle();
     return row.read(count) ?? 0;
   }
+
+  /// Cuenta imágenes con diagnóstico 'healthy'
+  Future<int> countHealthyImages() async {
+    final count = leafImages.id.count();
+    final query = selectOnly(leafImages)
+      ..addColumns([count])
+      ..where(leafImages.diagnosisClass.equals('healthy'));
+    final row = await query.getSingle();
+    return row.read(count) ?? 0;
+  }
+
+  /// Cuenta imágenes con diagnóstico de enfermedad (no healthy, no null)
+  Future<int> countDiseasedImages() async {
+    final count = leafImages.id.count();
+    final query = selectOnly(leafImages)
+      ..addColumns([count])
+      ..where(leafImages.diagnosisClass.isNotNull() &
+          leafImages.diagnosisClass.equals('healthy').not());
+    final row = await query.getSingle();
+    return row.read(count) ?? 0;
+  }
+
+  /// Obtiene la imagen más reciente con diagnóstico
+  Future<LeafImage?> getLastDiagnosedImage() =>
+      (select(leafImages)
+            ..where((t) => t.diagnosisClass.isNotNull())
+            ..orderBy([(t) => OrderingTerm.desc(t.capturedAt)])
+            ..limit(1))
+          .getSingleOrNull();
 }
 
 LazyDatabase _openConnection() {

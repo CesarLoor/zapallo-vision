@@ -10,9 +10,11 @@ import '../../config/disease_info.dart';
 import '../../core/database/app_database.dart';
 import '../../core/repositories/gallery_repository.dart';
 import '../../core/di/service_locator.dart';
+import '../../core/widgets/shared_diagnosis_widgets.dart';
 import 'cubit/gallery_cubit.dart';
 
 /// Pantalla de detalle de imagen guardada — HU-009, HU-010
+/// v1.5: Ahora muestra el reporte completo de diagnóstico con tabs
 class ImageDetailScreen extends StatelessWidget {
   final String imageId;
   final GalleryCubit? cubit;
@@ -43,15 +45,26 @@ class _ImageDetailView extends StatefulWidget {
   State<_ImageDetailView> createState() => _ImageDetailViewState();
 }
 
-class _ImageDetailViewState extends State<_ImageDetailView> {
+class _ImageDetailViewState extends State<_ImageDetailView>
+    with SingleTickerProviderStateMixin {
   LeafImage? _image;
   bool _loading = true;
   final _dateFormat = DateFormat('dd/MM/yyyy  HH:mm:ss');
+  late final TabController _tabController;
+
+  bool get _hasDiagnosis => _image?.diagnosisClass != null;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadImage();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadImage() async {
@@ -136,33 +149,42 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
     final date = _dateFormat.format(image.capturedAt);
 
     final text = StringBuffer()
-      ..writeln('🌱 ${AppConstants.msgShareTitle}')
+      ..writeln('DIAGNOSTICO ZAPALLOAI')
+      ..writeln('=' * 35)
       ..writeln()
-      ..writeln('📅 Fecha: $date')
-      ..writeln('🍂 Enfermedad: ${info.labelEs}')
-      ..writeln('📊 Confianza: $conf%')
-      ..writeln('⚠️ Severidad: ${info.severityLabel}')
+      ..writeln('Fecha:      $date')
+      ..writeln('Enfermedad: ${info.labelEs}')
+      ..writeln('Confianza:  $conf%')
+      ..writeln('Severidad:  ${info.severityLabel}')
       ..writeln()
-      ..writeln('📝 ${info.description}')
+      ..writeln('-' * 35)
+      ..writeln('DESCRIPCION')
+      ..writeln('-' * 35)
+      ..writeln(info.description)
       ..writeln();
 
     if (info.symptoms.isNotEmpty) {
-      text.writeln(info.isHealthy ? '✅ Características:' : '🔍 Síntomas:');
+      text.writeln('-' * 35);
+      text.writeln(info.isHealthy ? 'CARACTERISTICAS' : 'SINTOMAS');
+      text.writeln('-' * 35);
       for (final s in info.symptoms) {
-        text.writeln('  • $s');
+        text.writeln('  * $s');
       }
       text.writeln();
     }
 
     if (info.recommendations.isNotEmpty) {
-      text.writeln('💡 Recomendaciones:');
+      text.writeln('-' * 35);
+      text.writeln('RECOMENDACIONES');
+      text.writeln('-' * 35);
       for (var i = 0; i < info.recommendations.length; i++) {
         text.writeln('  ${i + 1}. ${info.recommendations[i]}');
       }
       text.writeln();
     }
 
-    text.writeln('— Generado por ZapalloAI v${AppConstants.appVersion}');
+    text.writeln('=' * 35);
+    text.writeln('Generado por ZapalloAI v${AppConstants.appVersion}');
 
     HapticFeedback.selectionClick();
     Clipboard.setData(ClipboardData(text: text.toString()));
@@ -194,168 +216,390 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
     final file = File(image.filePath);
 
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: CustomScrollView(
-        slivers: [
-          // ── AppBar con imagen ─────────────────────────────────
-          SliverAppBar(
-            expandedHeight: MediaQuery.of(context).size.height * 0.55,
-            pinned: true,
-            backgroundColor: Colors.black,
-            leading: IconButton(
-              key: const Key('btn_back_detail'),
-              icon: const Icon(Icons.arrow_back_ios_rounded,
-                  color: Colors.white),
-              onPressed: () => context.pop(),
-            ),
-            actions: [
-              if (image.diagnosisClass != null)
-                IconButton(
-                  key: const Key('btn_share_image'),
-                  icon: const Icon(Icons.share_outlined, color: Colors.white),
-                  onPressed: _shareDiagnosis,
-                  tooltip: 'Compartir diagnóstico',
-                ),
-              IconButton(
-                key: const Key('btn_delete_image'),
-                icon: const Icon(Icons.delete_outline_rounded,
-                    color: Colors.white),
-                onPressed: () => _confirmDelete(context),
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: InteractiveViewer(
-                child: Image.file(
-                  file,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) => const Center(
+      backgroundColor: ZapalloTheme.background,
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          _buildSliverAppBar(context, image, file),
+          if (_hasDiagnosis)
+            _buildDiagnosisHeader(image),
+          if (_hasDiagnosis)
+            _buildTabBar(),
+        ],
+        body: _hasDiagnosis
+            ? TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildReportTab(image),
+                  _buildDetailsTab(image),
+                ],
+              )
+            : _buildDetailsTab(image),
+      ),
+    );
+  }
+
+  // ── SliverAppBar con imagen ─────────────────────────────────────
+  SliverAppBar _buildSliverAppBar(
+      BuildContext context, LeafImage image, File file) {
+    final disease = _hasDiagnosis
+        ? DiseaseDatabase.getOrDefault(image.diagnosisClass!)
+        : null;
+
+    return SliverAppBar(
+      expandedHeight: MediaQuery.of(context).size.height * 0.42,
+      pinned: true,
+      backgroundColor: disease?.color ?? ZapalloTheme.primary,
+      leading: IconButton(
+        key: const Key('btn_back_detail'),
+        icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white),
+        onPressed: () => context.pop(),
+      ),
+      actions: [
+        if (_hasDiagnosis)
+          IconButton(
+            key: const Key('btn_share_image'),
+            icon: const Icon(Icons.share_outlined, color: Colors.white),
+            onPressed: _shareDiagnosis,
+            tooltip: 'Compartir diagnóstico',
+          ),
+        IconButton(
+          key: const Key('btn_delete_image'),
+          icon:
+              const Icon(Icons.delete_outline_rounded, color: Colors.white),
+          onPressed: () => _confirmDelete(context),
+        ),
+      ],
+      flexibleSpace: FlexibleSpaceBar(
+        background: Stack(
+          fit: StackFit.expand,
+          children: [
+            InteractiveViewer(
+              child: Image.file(
+                file,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.black,
+                  child: const Center(
                     child: Icon(Icons.broken_image_outlined,
                         color: Colors.white54, size: 80),
                   ),
                 ),
               ),
             ),
-          ),
-
-          // ── Metadatos ─────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Container(
-              decoration: const BoxDecoration(
-                color: ZapalloTheme.background,
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(24)),
+            // Gradient overlay
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.1),
+                    (disease?.color ?? Colors.black).withValues(alpha: 0.6),
+                  ],
+                ),
               ),
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Handle
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
+            ),
+            // Badge de resultado
+            if (disease != null)
+              Positioned(
+                bottom: 16,
+                left: 16,
+                right: 16,
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: ZapalloTheme.textHint,
-                        borderRadius: BorderRadius.circular(2),
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(16),
                       ),
+                      child: Icon(disease.icon,
+                          color: Colors.white, size: 28),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Título
-                  const Text(
-                    'Información de la captura',
-                    style: TextStyle(
-                      fontFamily: 'Outfit',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: ZapalloTheme.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Fecha y hora — FUN-008
-                  _InfoRow(
-                    icon: Icons.calendar_today_rounded,
-                    label: 'Fecha de captura',
-                    value: _dateFormat.format(image.capturedAt),
-                  ),
-                  const Divider(height: 24),
-
-                  // Diagnóstico (si existe)
-                  if (image.diagnosisClass != null) ...[
-                    const Text(
-                      'Resultado del diagnóstico',
-                      style: TextStyle(
-                        fontFamily: 'Outfit',
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                        color: ZapalloTheme.textPrimary,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            disease.labelEs,
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            '${((image.diagnosisConfidence ?? 0) * 100).toStringAsFixed(1)}% de confianza',
+                            style: TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 14,
+                              color: Colors.white.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    _InfoRow(
-                      icon: Icons.analytics_rounded,
-                      label: 'Enfermedad detectada',
-                      value: image.diagnosisLabel ?? 'Desconocida',
-                      valueColor: ZapalloTheme.primary,
-                    ),
-                    const SizedBox(height: 12),
-                    _InfoRow(
-                      icon: Icons.percent_rounded,
-                      label: 'Confianza',
-                      value: '${((image.diagnosisConfidence ?? 0) * 100).toStringAsFixed(1)}%',
-                    ),
-                    const Divider(height: 24),
-                  ],
-
-                  // ID — FUN-007
-                  _InfoRow(
-                    icon: Icons.fingerprint_rounded,
-                    label: 'Identificador',
-                    value: image.id.substring(0, 8).toUpperCase(),
-                  ),
-                  const Divider(height: 24),
-
-                  // Tamaño
-                  _InfoRow(
-                    icon: Icons.photo_size_select_actual_rounded,
-                    label: 'Tamaño del archivo',
-                    value: _formatFileSize(image.fileSize),
-                  ),
-
-                  // Calidad (si disponible)
-                  if (image.blurScore != null) ...[
-                    const Divider(height: 24),
-                    _InfoRow(
-                      icon: Icons.blur_circular_rounded,
-                      label: 'Nitidez',
-                      value: _formatBlur(image.blurScore!),
-                      valueColor: _blurColor(image.blurScore!),
                     ),
                   ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                  const SizedBox(height: 32),
+  // ── Header del diagnóstico (título de sección) ──────────────────
+  SliverToBoxAdapter _buildDiagnosisHeader(LeafImage image) {
+    return SliverToBoxAdapter(
+      child: Container(
+        color: ZapalloTheme.background,
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        child: Row(
+          children: [
+            Icon(Icons.assignment_rounded,
+                size: 22, color: ZapalloTheme.primary),
+            const SizedBox(width: 8),
+            const Text(
+              'Diagnóstico guardado',
+              style: TextStyle(
+                fontFamily: 'Outfit',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: ZapalloTheme.textPrimary,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: ZapalloTheme.primarySurface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _dateFormat.format(image.capturedAt),
+                style: const TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 10,
+                  fontWeight: FontWeight.w500,
+                  color: ZapalloTheme.primary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-                  // Botón eliminar
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      key: const Key('btn_delete_bottom'),
-                      onPressed: () => _confirmDelete(context),
-                      icon: const Icon(Icons.delete_outline_rounded),
-                      label: const Text('Eliminar imagen'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: ZapalloTheme.error,
-                        side: const BorderSide(color: ZapalloTheme.error),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
+  // ── TabBar ──────────────────────────────────────────────────────
+  SliverPersistentHeader _buildTabBar() {
+    return SliverPersistentHeader(
+      pinned: true,
+      delegate: _TabBarDelegate(
+        TabBar(
+          controller: _tabController,
+          labelColor: ZapalloTheme.primary,
+          unselectedLabelColor: ZapalloTheme.textHint,
+          indicatorColor: ZapalloTheme.primary,
+          indicatorWeight: 3,
+          labelStyle: const TextStyle(
+            fontFamily: 'Outfit',
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontFamily: 'Outfit',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+          tabs: const [
+            Tab(
+              icon: Icon(Icons.analytics_rounded, size: 20),
+              text: 'Reporte',
+            ),
+            Tab(
+              icon: Icon(Icons.info_outline_rounded, size: 20),
+              text: 'Detalles',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Tab 1: Reporte de diagnóstico completo ─────────────────────
+  Widget _buildReportTab(LeafImage image) {
+    final disease = DiseaseDatabase.getOrDefault(image.diagnosisClass!);
+    final confidence = image.diagnosisConfidence ?? 0;
+    final isLowConf = confidence < AppConstants.minConfidenceThreshold;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Reutilizar el widget compartido de reporte completo
+          DiagnosisReportSection(
+            disease: disease,
+            confidence: confidence,
+            isLowConfidence: isLowConf,
+            animate: false,
+          ),
+          const SizedBox(height: 24),
+
+          // Botones de acción
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('btn_share_report'),
+                  onPressed: _shareDiagnosis,
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  label: const Text('Copiar reporte'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('btn_delete_bottom'),
+                  onPressed: () => _confirmDelete(context),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  label: const Text('Eliminar'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: ZapalloTheme.error,
+                    side: const BorderSide(color: ZapalloTheme.error),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  // ── Tab 2: Detalles técnicos / metadatos ───────────────────────
+  Widget _buildDetailsTab(LeafImage image) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Información de la captura
+          SectionCard(
+            title: 'Información de la captura',
+            icon: Icons.photo_camera_rounded,
+            child: Column(
+              children: [
+                _InfoRow(
+                  icon: Icons.calendar_today_rounded,
+                  label: 'Fecha de captura',
+                  value: _dateFormat.format(image.capturedAt),
+                ),
+                const Divider(height: 20),
+                _InfoRow(
+                  icon: Icons.fingerprint_rounded,
+                  label: 'Identificador',
+                  value: image.id.substring(0, 8).toUpperCase(),
+                ),
+                const Divider(height: 20),
+                _InfoRow(
+                  icon: Icons.photo_size_select_actual_rounded,
+                  label: 'Tamaño del archivo',
+                  value: _formatFileSize(image.fileSize),
+                ),
+                if (image.width > 0 && image.height > 0) ...[
+                  const Divider(height: 20),
+                  _InfoRow(
+                    icon: Icons.aspect_ratio_rounded,
+                    label: 'Resolución',
+                    value: '${image.width} × ${image.height} px',
+                  ),
+                ],
+                if (image.blurScore != null) ...[
+                  const Divider(height: 20),
+                  _InfoRow(
+                    icon: Icons.blur_circular_rounded,
+                    label: 'Nitidez',
+                    value: _formatBlur(image.blurScore!),
+                    valueColor: _blurColor(image.blurScore!),
+                  ),
+                ],
+                if (image.brightnessScore != null) ...[
+                  const Divider(height: 20),
+                  _InfoRow(
+                    icon: Icons.brightness_6_rounded,
+                    label: 'Brillo',
+                    value: _formatBrightness(image.brightnessScore!),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Resultado de clasificación (resumen)
+          if (_hasDiagnosis)
+            SectionCard(
+              title: 'Resultado de clasificación',
+              icon: Icons.analytics_rounded,
+              child: Column(
+                children: [
+                  _InfoRow(
+                    icon: Icons.local_florist_rounded,
+                    label: 'Clase detectada',
+                    value: image.diagnosisLabel ?? 'Desconocida',
+                    valueColor: DiseaseDatabase.getOrDefault(
+                            image.diagnosisClass!)
+                        .color,
+                  ),
+                  const Divider(height: 20),
+                  _InfoRow(
+                    icon: Icons.percent_rounded,
+                    label: 'Confianza',
+                    value:
+                        '${((image.diagnosisConfidence ?? 0) * 100).toStringAsFixed(1)}%',
+                  ),
+                  const Divider(height: 20),
+                  _InfoRow(
+                    icon: Icons.speed_rounded,
+                    label: 'Severidad',
+                    value: DiseaseDatabase.getOrDefault(
+                            image.diagnosisClass!)
+                        .severityLabel,
+                    valueColor: DiseaseInfo.severityColor(
+                        DiseaseDatabase.getOrDefault(
+                                image.diagnosisClass!)
+                            .severity),
                   ),
                 ],
               ),
             ),
-          ),
+
+          const SizedBox(height: 24),
+
+          if (!_hasDiagnosis) ...[
+            // Botón eliminar (cuando no hay tabs)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const Key('btn_delete_bottom'),
+                onPressed: () => _confirmDelete(context),
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Eliminar imagen'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: ZapalloTheme.error,
+                  side: const BorderSide(color: ZapalloTheme.error),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
+          ],
         ],
       ),
     );
@@ -378,7 +622,40 @@ class _ImageDetailViewState extends State<_ImageDetailView> {
     if (score > 80) return ZapalloTheme.secondary;
     return ZapalloTheme.error;
   }
+
+  String _formatBrightness(double score) {
+    if (score < AppConstants.brightnessMin) return 'Oscura (${score.toStringAsFixed(0)})';
+    if (score > AppConstants.brightnessMax) return 'Sobreexpuesta (${score.toStringAsFixed(0)})';
+    return 'Normal (${score.toStringAsFixed(0)})';
+  }
 }
+
+// ── Delegado de TabBar persistente ───────────────────────────────
+
+class _TabBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+  _TabBarDelegate(this.tabBar);
+
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: ZapalloTheme.background,
+      child: tabBar,
+    );
+  }
+
+  @override
+  bool shouldRebuild(_TabBarDelegate oldDelegate) => false;
+}
+
+// ── Widget InfoRow reutilizable ──────────────────────────────────
 
 class _InfoRow extends StatelessWidget {
   final IconData icon;
