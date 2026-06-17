@@ -192,8 +192,8 @@ def _build_pipeline():
                               sat_shift_limit=40,
                               val_shift_limit=20, p=0.5),
         A.GaussianBlur(blur_limit=(3, 7), p=0.2),
-        A.GaussNoise(var_limit=(10.0, 50.0), p=0.2),
-        A.CoarseDropout(max_holes=6, max_height=30, max_width=30, p=0.3),
+        A.GaussNoise(std_range=(0.04, 0.2), p=0.2),
+        A.CoarseDropout(num_holes_range=(1, 6), hole_height_range=(0.1, 0.15), hole_width_range=(0.1, 0.15), p=0.3),
     ])
 
 

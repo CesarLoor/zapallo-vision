@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-06-16T17:44:34.127733",
+  "num_classes": 5,
+  "classes": [
+    "downy_mildew",
+    "healthy",
+    "leaf_curl",
+    "mosaic_virus",
+    "red_beetle"
+  ],
+  "per_class": {
+    "downy_mildew": {
+      "train": 1253,
+      "val": 268,
+      "test": 269,
+      "total": 1790
+    },
+    "healthy": {
+      "train": 1477,
+      "val": 316,
+      "test": 317,
+      "total": 2110
+    },
+    "leaf_curl": {
+      "train": 979,
+      "val": 210,
+      "test": 211,
+      "total": 1400
+    },
+    "mosaic_virus": {
+      "train": 1260,
+      "val": 270,
+      "test": 270,
+      "total": 1800
+    },
+    "red_beetle": {
+      "train": 979,
+      "val": 210,
+      "test": 211,
+      "total": 1400
+    }
+  },
+  "total": {
+    "train": 5948,
+    "val": 1274,
+    "test": 1278
+  },
+  "balance_ratio": 1.51,
+  "total_images": 8500
+}

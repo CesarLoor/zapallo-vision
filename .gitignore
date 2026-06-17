@@ -66,3 +66,6 @@ htmlcov/
 # Flutter auto-generated
 .flutter-plugins
 .flutter-plugins-dependencies
+
+# Virtual environment
+.venv/*

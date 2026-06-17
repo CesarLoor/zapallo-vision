@@ -1,6 +1,6 @@
 # Dataset ZapalloAI — generado por preprocess.py
 # Clases en orden alfabético (coincide con YOLO)
-path: ./processed
+path: D:/zapallo-vision/model/data/processed
 train: train
 val: val
 test: test
