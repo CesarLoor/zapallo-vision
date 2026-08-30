@@ -28,6 +28,7 @@ CLASSES: Final[list[str]] = [
     "healthy",
     "leaf_curl",
     "mosaic_virus",
+    "not_leaf",
     "red_beetle",
 ]
 
@@ -45,6 +46,7 @@ RUNS_DIR: Final[Path] = MODEL_DIR / "runs" / "classify"
 CUCURBIT_DIR: Final[Path] = RAW_DIR / "Cucurbit_leaf"
 SWEET_DIR: Final[Path] = RAW_DIR / "sweet_pumpkin"
 SWEET_AUG_DIR: Final[Path] = SWEET_DIR / "Augmented Images"
+NOT_LEAF_DIR: Final[Path] = RAW_DIR / "not_leaf"
 
 # ── Mapeo de nombres de carpetas raw → clases normalizadas ─────────
 CUCURBIT_MAP: Final[dict[str, str]] = {
@@ -70,12 +72,12 @@ TEST_RATIO: Final[float] = 0.15
 TARGET_PER_CLASS: int | None = None  # None = usar la clase más grande
 
 # ── Parámetros de entrenamiento (GPU 4GB VRAM) ─────────────────────
-EPOCHS: Final[int] = 100
+EPOCHS: Final[int] = 60
 IMAGE_SIZE: Final[int] = 224
 BATCH_SIZE: int = 4  # se auto-detecta según VRAM
 ACCUMULATE: Final[int] = 2  # gradient accumulation steps
 AMP: Final[bool] = False
-PATIENCE: Final[int] = 15
+PATIENCE: Final[int] = 10
 WORKERS: Final[int] = 0  # Windows requiere workers=0 para multiprocessing
 
 # ── Rutas de exportación Flutter ──────────────────────────────────

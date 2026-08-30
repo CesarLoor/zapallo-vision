@@ -10,11 +10,15 @@ class ClassificationResult {
   final String classKey;
   final double confidence;
   final Map<String, double> allScores;
+  final bool isLeaf;
+  final String? rejectionReason;
 
   const ClassificationResult({
     required this.classKey,
     required this.confidence,
     required this.allScores,
+    this.isLeaf = true,
+    this.rejectionReason,
   });
 
   @override
@@ -30,6 +34,9 @@ class ClassifierService {
   static const String _modelAsset = 'assets/models/best_int8.tflite';
   static const String _labelsAsset = 'assets/models/labels.txt';
   static const int _inputSize = 224;
+  static const String _notLeafClass = 'not_leaf';
+  static const double _minimumConfidence = 0.55;
+  static const double _minimumMargin = 0.12;
   
   // Hacer públicos para verificación en main.dart
   static String get modelAsset => _modelAsset;
@@ -178,10 +185,25 @@ class ClassifierService {
       }
     }
 
+    final sortedScores = List<double>.from(scores)..sort((a, b) => b.compareTo(a));
+    final margin = sortedScores.length > 1
+        ? sortedScores[0] - sortedScores[1]
+        : sortedScores[0];
+    final predictedClass = _labels[maxIdx];
+    final isExplicitNegative = predictedClass == _notLeafClass;
+    final isUncertain = maxVal < _minimumConfidence || margin < _minimumMargin;
+    final isLeaf = !isExplicitNegative && !isUncertain;
+
     return ClassificationResult(
-      classKey: _labels[maxIdx],
+      classKey: predictedClass,
       confidence: maxVal,
       allScores: allScores,
+      isLeaf: isLeaf,
+      rejectionReason: isExplicitNegative
+          ? 'No se detectó una hoja. Tome de nuevo la imagen.'
+          : isUncertain
+              ? 'No se pudo confirmar que sea una hoja. Tome de nuevo la imagen.'
+              : null,
     );
   }
 

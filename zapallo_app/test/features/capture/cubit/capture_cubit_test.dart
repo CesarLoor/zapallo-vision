@@ -122,6 +122,33 @@ void main() {
       await cubit.classifyImage('test.jpg', report);
     });
 
+    test('classifyImage rejects an image that is not a leaf', () async {
+      const report = ImageValidationReport(
+        result: ValidationResult.acceptable,
+        blurScore: 150.0,
+        brightnessScore: 128.0,
+      );
+      const result = ClassificationResult(
+        classKey: 'not_leaf',
+        confidence: 0.96,
+        allScores: {'not_leaf': 0.96, 'healthy': 0.04},
+        isLeaf: false,
+        rejectionReason: 'No se detectó una hoja. Tome de nuevo la imagen.',
+      );
+      when(() => repository.classifyImage('person.jpg'))
+          .thenAnswer((_) async => result);
+
+      expectLater(
+        cubit.stream,
+        emitsInOrder(const [
+          CaptureClassifying(),
+          CaptureNotLeaf('No se detectó una hoja. Tome de nuevo la imagen.'),
+        ]),
+      );
+
+      await cubit.classifyImage('person.jpg', report);
+    });
+
     test('saveImage emits saving then saved', () async {
       const report = ImageValidationReport(
         result: ValidationResult.acceptable,

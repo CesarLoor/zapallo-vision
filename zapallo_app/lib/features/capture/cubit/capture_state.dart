@@ -54,3 +54,10 @@ class CaptureClassified extends CaptureState {
   @override
   List<Object?> get props => [imagePath, result, validationReport];
 }
+
+class CaptureNotLeaf extends CaptureState {
+  final String message;
+  const CaptureNotLeaf(this.message);
+  @override
+  List<Object?> get props => [message];
+}

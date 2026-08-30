@@ -55,6 +55,15 @@ class _PreviewView extends StatelessWidget {
               'validationReport': state.validationReport,
             });
           }
+          if (state is CaptureNotLeaf) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(state.message),
+                backgroundColor: ZapalloTheme.warning,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
           if (state is CaptureError) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -191,10 +200,25 @@ class _PreviewView extends StatelessWidget {
 
     final isValidated = state is CaptureValidated;
     final report = isValidated ? state.report : null;
+    final isNotLeaf = state is CaptureNotLeaf;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (isNotLeaf) ...[
+          Text(
+            state.message,
+            key: const Key('not_leaf_message'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.white,
+              fontFamily: 'Outfit',
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
         Row(
           children: [
             Expanded(

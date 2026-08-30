@@ -47,6 +47,7 @@ from config import (
     CUCURBIT_DIR,
     CUCURBIT_MAP,
     IMAGE_EXTENSIONS,
+    NOT_LEAF_DIR,
     PROCESSED_DIR,
     RANDOM_SEED,
     SWEET_AUG_DIR,
@@ -64,12 +65,12 @@ def _tqdm(iterable, **kwargs):
 # ── Utilidades de archivos ──────────────────────────────────────────
 
 
-def get_images(folder: Path) -> list[Path]:
+def get_images(folder: Path, recursive: bool = False) -> list[Path]:
     if not folder.exists():
         return []
     result: list[Path] = []
     for ext in IMAGE_EXTENSIONS:
-        result.extend(folder.glob(ext))
+        result.extend(folder.rglob(ext) if recursive else folder.glob(ext))
     return result
 
 
@@ -96,6 +97,12 @@ def collect_all() -> dict[str, list[Path]]:
         imgs = get_images(SWEET_AUG_DIR / folder_name)
         by_cls[cls_name].extend(imgs)
         print(f"  Sweet    / {folder_name[:30]:<30}: {len(imgs):>5} -> {cls_name}")
+
+    # Negativos reales: personas, manos, herramientas, suelo, frutos, paredes,
+    # pantallas y cualquier escena donde una hoja no sea el sujeto principal.
+    negatives = get_images(NOT_LEAF_DIR, recursive=True)
+    by_cls["not_leaf"].extend(negatives)
+    print(f"  Negativos / not_leaf{'':<20}: {len(negatives):>5} -> not_leaf")
 
     return by_cls
 
@@ -152,6 +159,11 @@ def split_and_copy(deduped: dict[str, list[Path]]) -> dict[str, dict[str, int]]:
 
     for cls in CLASSES:
         imgs = deduped[cls].copy()
+        if not imgs:
+            raise RuntimeError(
+                f"La clase {cls!r} no contiene imágenes. "
+                "Agrega datos antes de crear el dataset procesado."
+            )
         random.shuffle(imgs)
         n = len(imgs)
         n_train = int(n * TRAIN_RATIO)
@@ -166,7 +178,10 @@ def split_and_copy(deduped: dict[str, list[Path]]) -> dict[str, dict[str, int]]:
         for split_name, split_imgs in splits.items():
             dst_dir = PROCESSED_DIR / split_name / cls
             for img_path in split_imgs:
-                prefix = "swe" if "sweet_pumpkin" in str(img_path) else "cuc"
+                if cls == "not_leaf":
+                    prefix = "neg"
+                else:
+                    prefix = "swe" if "sweet_pumpkin" in str(img_path) else "cuc"
                 dst = dst_dir / f"{prefix}_{img_path.name}"
                 if not dst.exists():
                     shutil.copy2(img_path, dst)

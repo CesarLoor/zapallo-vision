@@ -24,6 +24,11 @@ class CaptureCubit extends Cubit<CaptureState> {
     emit(const CaptureClassifying());
     try {
       final result = await _repository.classifyImage(imagePath);
+      if (!result.isLeaf) {
+        emit(CaptureNotLeaf(result.rejectionReason ??
+            'No se detectó una hoja. Tome de nuevo la imagen.'));
+        return;
+      }
       emit(CaptureClassified(
         imagePath: imagePath,
         result: result,

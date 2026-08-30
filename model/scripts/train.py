@@ -60,12 +60,21 @@ def _validate_dataset(processed_dir: Path) -> bool:
         return False
 
     for split in ("train", "val", "test"):
-        n = sum(1 for _ in processed_dir.rglob("*.*")
+        split_dir = processed_dir / split
+        n = sum(1 for _ in split_dir.rglob("*.*")
                 if _.suffix.lower() in {".jpg", ".jpeg", ".png"})
         if n == 0:
             print(f"ERROR: {split}/ está vacío")
             return False
         print(f"  {split:<5}: {n:,} imágenes")
+
+    classes = {
+        p.name for p in (processed_dir / "train").iterdir() if p.is_dir()
+    }
+    if "not_leaf" not in classes:
+        print("ERROR: Falta la clase obligatoria 'not_leaf'.")
+        print("  Agrega negativos en model/data/raw/not_leaf y preprocesa de nuevo.")
+        return False
 
     return True
 
@@ -95,7 +104,7 @@ def train(args: argparse.Namespace, processed_dir: Path,
         lr0=0.001,
         lrf=0.01,
         momentum=0.937,
-        weight_decay=0.0005,
+        weight_decay=0.001,
         warmup_epochs=3,
         cos_lr=True,
         augment=True,
@@ -106,10 +115,11 @@ def train(args: argparse.Namespace, processed_dir: Path,
         hsv_s=0.7,
         hsv_v=0.4,
         erasing=0.4,
-        mixup=0.1,
+        mixup=0.15,
+        dropout=0.2,
         project=str(project_dir),
         name=args.run_name,
-        exist_ok=True,
+        exist_ok=False,
         device=0,
         workers=0,
         amp=args.amp,
@@ -174,19 +184,21 @@ def export(args: argparse.Namespace, project_dir: Path,
     val_path.write_text(json.dumps(val_metrics, indent=2), encoding="utf-8")
     print(f"  Top-1: {val_metrics['top1']}, Top-5: {val_metrics['top5']} → {val_path}")
 
-    # Copiar a assets de Flutter
+    # Copiar a assets de Flutter únicamente con autorización explícita.
     flutter_assets = Path(__file__).resolve().parents[2] / "zapallo_app" / "assets" / "models"
-    if flutter_assets.exists():
+    if args.deploy and flutter_assets.exists():
         for f in glob.glob(str(export_dir / "*")):
             if Path(f).is_file():
                 shutil.copy2(f, flutter_assets)
                 print(f"  → {flutter_assets / Path(f).name}")
         print("Modelo copiado a Flutter assets")
-    else:
+    elif args.deploy:
         print(f"⚠️  No se encontró Flutter assets: {flutter_assets}")
         print("   Copia manualmente:")
         print(f"     {export_dir / 'best_int8.tflite'} → zapallo_app/assets/models/")
         print(f"     {export_dir / 'labels.txt'} → zapallo_app/assets/models/")
+    else:
+        print("Modelo actual de Flutter preservado (usa --deploy para reemplazarlo).")
 
     return val_metrics
 
@@ -273,18 +285,20 @@ def _parse_args() -> argparse.Namespace:
                         help="Reanudar entrenamiento desde último checkpoint")
     parser.add_argument("--export-only", action="store_true",
                         help="Solo exportar TFLite desde best.pt existente")
-    parser.add_argument("--epochs", type=int, default=100,
-                        help="Número de épocas (default: 100)")
+    parser.add_argument("--epochs", type=int, default=60,
+                        help="Número de épocas (default: 60)")
     parser.add_argument("--batch", type=int, default=0,
                         help="Batch size (0 = auto-detect)")
     parser.add_argument("--accumulate", type=int, default=0,
                         help="Gradient accumulation steps (0 = auto)")
-    parser.add_argument("--patience", type=int, default=15,
-                        help="Early stopping patience (default: 15)")
+    parser.add_argument("--patience", type=int, default=10,
+                        help="Early stopping patience (default: 10)")
     parser.add_argument("--amp", action="store_true", default=False,
                         help="Activar AMP (no recomendado en GTX 1650)")
-    parser.add_argument("--run-name", type=str, default="zapallo_yolov11n",
-                        help="Nombre del run (default: zapallo_yolov11n)")
+    parser.add_argument("--run-name", type=str, default="zapallo_yolov11n_v2",
+                        help="Nombre de run nuevo (default: zapallo_yolov11n_v2)")
+    parser.add_argument("--deploy", action="store_true",
+                        help="Copiar el modelo validado a los assets de Flutter")
     parser.add_argument("--model-pt", type=str,
                         default="yolo11n-cls.pt",
                         help="Ruta al checkpoint base")
@@ -298,7 +312,9 @@ def main():
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from config import EXPORT_DIR, PROCESSED_DIR, RUNS_DIR
 
-    export_dir = EXPORT_DIR
+    # Cada entrenamiento exporta a su propia carpeta. Así una prueba nueva no
+    # sobrescribe los artefactos estables que usa actualmente la aplicación.
+    export_dir = EXPORT_DIR / args.run_name
     export_dir.mkdir(parents=True, exist_ok=True)
 
     print("=" * 55)
